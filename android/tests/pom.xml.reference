@@ -1,0 +1,7 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>
+<groupId>x</groupId><artifactId>x</artifactId><version>1</version>
+<repositories><repository><id>g</id><url>https://maven.google.com</url></repository></repositories><dependencies>
+<dependency><groupId>org.robolectric</groupId><artifactId>robolectric</artifactId><version>4.10.3</version></dependency>
+<dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version></dependency>
+<dependency><groupId>org.robolectric</groupId><artifactId>android-all-instrumented</artifactId><version>13-robolectric-9030017-i4</version></dependency>
+</dependencies></project>
