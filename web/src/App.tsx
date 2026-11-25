@@ -307,84 +307,39 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
     </>;
 }
 
-function HomeScreen({state,update,start,open,finish,storage,celebrate,wrongSet,history,startRun}: {state:Saved;update:(v:Partial<Saved>)=>void;start:()=>void;open:(filter:string)=>void;finish:()=>void;storage:string;celebrate:boolean;wrongSet:Set<number>;history:Attempt[];startRun:(r:Run)=>void}) {
+function HomeScreen({state,update,open,finish,storage,celebrate,wrongSet,history,startRun,onCard}: {state:Saved;update:(v:Partial<Saved>)=>void;open:(filter:string)=>void;finish:()=>void;storage:string;celebrate:boolean;wrongSet:Set<number>;history:Attempt[];startRun:(r:Run)=>void;onCard:(b:typeof banks[number])=>void}) {
  const {picked,ids,submitted,started,setup,elapsed} = state;
  const right=ids.filter(id=>picked[id]===questions[id].c).length;const wrong=ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c).length;const blank=ids.filter(id=>picked[id]===null).length;
  const bank=banks.find(b=>b.id===setup.section)||banks[0];
  const [bankQuery,setBankQuery]=useState('');
  const filtered=bankQuery?banks.filter(b=>b.name.includes(bankQuery)):banks;
  const groups=Array.from(new Set(banks.map(b=>b.group)));
- const confetti=React.useMemo(()=>Array.from({length:26},(_,i)=>({left:(i*37+13)%100,delay:(i%9)*0.14,duration:2.2+(i%5)*0.35,color:['#0b4f4a','#e4f5a4','#7fd08a','#ffffff','#c9ef6b'][i%5],size:6+(i%3)*3})),[]);
+ const confetti=React.useMemo(()=>Array.from({length:12},(_,i)=>({left:(i*37+13)%100,delay:(i%9)*0.09,duration:1.4+(i%5)*0.2,color:['#0b4f4a','#e4f5a4','#7fd08a','#ffffff','#c9ef6b'][i%5],size:6+(i%3)*3})),[]);
+ const flagIds=[...state.favorites].sort((a,b)=>a-b);
+ const wrongIds=[...wrongSet].sort((a,b)=>a-b);
+ // Round 4: per-exam status for the cards (mirrors Android examCard).
+ const isLive=(b:typeof banks[number])=>started&&!submitted&&state.run==='all'&&(state.bank??setup.section)===b.id;
+ const cardStatus=(b:typeof banks[number])=>{
+   if(isLive(b)){const answered=ids.filter(id=>picked[id]!==null).length;return `جارٍ — سؤال ${toAr(String(answered+1))} من ${toAr(String(ids.length))}`;}
+   const last=[...history].reverse().find(h=>h.b===b.id);
+   if(last)return `آخر نتيجة ${toAr(String(last.n?Math.round(last.r/last.n*100):0))}٪`;
+   return 'لم يبدأ';
+ };
  return <div className="qz-home">
  {celebrate&&state.settings.fx&&!state.settings.calm&&<div className="qz-confetti" aria-hidden="true">{confetti.map((p,i)=><i key={i} style={{left:`${p.left}%`,width:p.size,height:p.size*1.4,background:p.color,animationDelay:`${p.delay}s`,animationDuration:`${p.duration}s`}}/>)}</div>}
  <p className={"qz-home-title"+(!submitted&&!started?" qz-home-quiz":"")}>{submitted?'نتيجة التجربة':started?'كمّل من مكانك':bank.name}</p>
  <p className="qz-save-status" role="status">{storage}</p>{started&&<p className="qz-set-detail">{state.run==='notebook'||state.run==='flagged'?runLabel(state.run):(banks.find(b=>b.ids.includes(ids[0]))||bank).name}</p>}
- {submitted?<>{celebrate&&<p className="qz-bravo" role="status">برافو! نتيجة عالية 🎉</p>}<div className="qz-score"><strong><bdi>{toAr(String(Math.round(right/ids.length*100)))}٪</bdi></strong><span>{toAr(String(right))} صح من {toAr(String(ids.length))}</span></div><div className="qz-result-grid">{[[right,'صح'],[wrong,'غلط'],[blank,'بدون إجابة']].map(([n,l])=><div key={l}><b>{toAr(String(n))}</b><span>{l}</span></div>)}</div><p className="qz-home-time"><ClockIcon/> وقت الحل: <bdi>{formatTime(state.resultElapsed??elapsed)}</bdi></p><p className="qz-set-detail">الأسئلة المتروكة محسوبة في الدرجة.</p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>مراجعة كل الإجابات</button><button type="button" className="qz-btn ghost" disabled={wrong===0} onClick={()=>open('wrong')}>مراجعة الغلط فقط ({toAr(String(wrong))})</button></div></>:started?<><p className="qz-home-sub">جاوبت {toAr(String(ids.length-blank))} من {toAr(String(ids.length))} · {state.mode==='exam'?'امتحان':'مذاكرة'}</p><details className="qz-session-map"><summary>خريطة الأسئلة</summary><div className="qz-home-cards">{ids.map(id=><button type="button" className="qz-home-card" key={id} onClick={()=>{open('all');update({index:id});}}><span className="qz-home-card-num">سؤال {toAr(String(ids.indexOf(id)+1))}</span><span className="qz-home-card-state">{picked[id]===null?'لسه':state.mode==='exam'?'تم الاختيار':picked[id]===questions[id].c?'صح ✓':'غلط ✕'}</span></button>)}</div></details><p className="qz-home-time"><ClockIcon/><bdi>{formatTime(elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>كمّل الحل</button><button type="button" className="qz-btn ghost" onClick={finish}>إنهاء وعرض النتيجة</button></div></>:null}
- <details className="qz-set-group" open={!started}><summary>{started?'تجربة جديدة':'إعداد التجربة'}</summary><div className="qz-setup">
- <label className="qz-set-label" htmlFor="bank-search">الاختبار أو البنك</label><input id="bank-search" className="qz-bank-input qz-bank-search" type="search" placeholder="ابحث عن بنك…" aria-label="ابحث عن بنك" value={bankQuery} onChange={e=>setBankQuery(e.target.value)}/><div className="qz-bank-list" role="listbox" aria-label="الاختبار أو البنك">{groups.map(g=>{const gb=filtered.filter(b=>b.group===g);if(!gb.length)return null;const totalQ=gb.reduce((a,b)=>a+b.ids.length,0);return <div key={g} className="qz-bank-group"><p className="qz-bank-group-label">{g==='tests'?'الاختبارات':g} · {toAr(String(totalQ))} سؤال</p>{gb.map(b=><button type="button" key={b.id} role="option" aria-selected={setup.section===b.id} className={'qz-bank-opt'+(setup.section===b.id?' is-on':'')} onClick={()=>update({setup:{section:b.id,mode:setup.mode},settings:{...state.settings,minutes:b.minutes}})}>{b.name} · {toAr(String(b.ids.length))} سؤال</button>)}</div>;})}{filtered.length===0&&<p className="qz-set-detail">مفيش نتائج للبحث.</p>}</div>
-
- <span className="qz-set-label">طريقة التجربة</span><div className="qz-set-seg">{[['study','مذاكرة'],['exam','امتحان']].map(([v,l])=><button type="button" className={'qz-set-seg-btn'+(setup.mode===v?' is-on':'')} key={v} aria-pressed={setup.mode===v} onClick={()=>update({setup:{...setup,mode:v as Mode}})}>{l}</button>)}</div><p className="qz-set-detail">{setup.mode==='study'?'تصحيح فوري، مع التلميح والشرح حسب إعداداتك.':'من غير تلميحات أو تصحيح أو شرح لحد التسليم. تقدر تغيّر إجابتك قبل النهاية.'}</p><button type="button" className="qz-btn primary qz-home-cta" onClick={start}>ابدأ تجربة {setup.mode==='study'?'مذاكرة':'امتحان'}</button></div></details>
- <LearnPanels wrongSet={wrongSet} flagged={state.favorites} history={history} startRun={startRun} mode={setup.mode}/>
- <InfoPanels/>
-
+ {submitted?<>{celebrate&&<p className="qz-bravo" role="status">برافو! نتيجة عالية 🎉</p>}<div className="qz-score"><strong><bdi>{toAr(String(Math.round(right/ids.length*100)))}٪</bdi></strong><span>{toAr(String(right))} صح من {toAr(String(ids.length))}</span></div><div className="qz-result-grid">{[[right,'صح'],[wrong,'غلط'],[blank,'بدون إجابة']].map(([n,l])=><div key={l}><b>{toAr(String(n))}</b><span>{l}</span></div>)}</div><p className="qz-home-time"><ClockIcon/> وقت الحل: <bdi>{formatTime(state.resultElapsed??elapsed)}</bdi></p><p className="qz-set-detail">الأسئلة المتروكة محسوبة في الدرجة.</p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>document.getElementById('qz-exam-list')?.scrollIntoView({behavior:'smooth'})}>القائمة</button><button type="button" className="qz-btn primary" onClick={()=>open('all')}>مراجعة كل الإجابات</button><button type="button" className="qz-btn ghost" disabled={wrong===0} onClick={()=>open('wrong')}>مراجعة الغلط فقط ({toAr(String(wrong))})</button></div></>:started?<><p className="qz-home-sub">جاوبت {toAr(String(ids.length-blank))} من {toAr(String(ids.length))} · {state.mode==='exam'?'امتحان':'مذاكرة'}</p><details className="qz-session-map"><summary>خريطة الأسئلة</summary><div className="qz-home-cards">{ids.map(id=><button type="button" className="qz-home-card" key={id} onClick={()=>{open('all');update({index:id});}}><span className="qz-home-card-num">سؤال {toAr(String(ids.indexOf(id)+1))}</span><span className="qz-home-card-state">{picked[id]===null?'لسه':state.mode==='exam'?'تم الاختيار':picked[id]===questions[id].c?'صح ✓':'غلط ✕'}</span></button>)}</div></details><p className="qz-home-time"><ClockIcon/><bdi>{formatTime(elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>كمّل الحل</button><button type="button" className="qz-btn ghost" onClick={finish}>إنهاء وعرض النتيجة</button></div></>:null}
+ {/* Round 4: home is cards only — no setup <details>, no instruction panels. */}
+ <div className="qz-setup" id="qz-exam-list">
+ <span className="qz-set-label">طريقة التجربة</span><div className="qz-set-seg">{[['study','مذاكرة'],['exam','امتحان']].map(([v,l])=><button type="button" className={'qz-set-seg-btn'+(setup.mode===v?' is-on':'')} key={v} aria-pressed={setup.mode===v} onClick={()=>update({setup:{...setup,mode:v as Mode}})}>{l}</button>)}</div>
+ {(wrongSet.size>0||flagIds.length>0)&&<div className="qz-learn-row">{wrongSet.size>0&&<button type="button" className="qz-btn primary" onClick={()=>startRun({kind:'notebook',ids:wrongIds})}>دفتر الغلطات ({toAr(String(wrongIds.length))})</button>}{flagIds.length>0&&<button type="button" className="qz-btn primary" onClick={()=>startRun({kind:'flagged',ids:flagIds})}>راجعني ({toAr(String(flagIds.length))})</button>}</div>}
+ <label className="qz-set-label" htmlFor="bank-search">الاختبار أو البنك</label><input id="bank-search" className="qz-bank-input qz-bank-search" type="search" placeholder="ابحث عن بنك…" aria-label="ابحث عن بنك" value={bankQuery} onChange={e=>setBankQuery(e.target.value)}/>
+ <div className="qz-bank-list" role="listbox" aria-label="الاختبار أو البنك">{groups.map(g=>{const gb=filtered.filter(b=>b.group===g);if(!gb.length)return null;const totalQ=gb.reduce((a,b)=>a+b.ids.length,0);return <div key={g} className="qz-bank-group"><p className="qz-bank-group-label">{g==='tests'?'الاختبارات':g} · {toAr(String(totalQ))} سؤال</p><div className="qz-exam-grid">{gb.map(b=>{const live=isLive(b);return <button type="button" key={b.id} role="option" aria-selected={setup.section===b.id} className={'qz-exam-card'+(live?' is-live':'')+(setup.section===b.id&&!live?' is-on':'')} onClick={()=>onCard(b)}><span className="qz-exam-card-name">{b.name}</span><span className="qz-exam-card-meta">{toAr(String(b.ids.length))} سؤال · {toAr(String(b.minutes))} د</span><span className="qz-exam-card-status">{cardStatus(b)}</span></button>;})}</div></div>;})}{filtered.length===0&&<p className="qz-set-detail">مفيش نتائج للبحث.</p>}</div>
+ </div>
  </div>;
 }
 
-
-const infoConfirmed = ['الامتحان 100 سؤال اختيار من متعدد، وزمنه لا يتجاوز 3 ساعات.','النتيجة نجاح أو رسوب (Pass or Fail) من غير درجات.','الدخول من لابتوب أو كمبيوتر فيه كاميرا (USB)، والكاميرا تشتغل طول الامتحان.','ارفع صورة شخصية بخلفية بيضاء قبل أي امتحان، وإلا ممكن يتلغي الامتحان أو يتعلّق البروفايل.','اقعد لوحدك في مكان هادي ومنعزل وبشكل لائق طول الامتحان.','ادخل الموقع قبل الميعاد بـ20 دقيقة على الأقل.','ممنوع فتح أي متصفح أو موقع تاني، أو استخدام أجهزة تانية أو سماعات خارجية، والمخالفة بتلغي الامتحان.','في كل دور 3 امتحانات فعلية، تنجح في أي واحد منهم، والمحسوب آخر امتحان تدخله. لو نجحت من أول مرة الأفضل ما تدخلش تاني.'];
-// S4-3: the unconfirmed stats (60٪ pass rate, question split) and the stale July 2024 payment panel are
-// removed entirely — no verification wording or unconfirmed numbers in the UI.
-function InfoPanels() {
-    return <>
-        <details className="qz-set-group" open><summary>تعليمات الامتحان الفعلي <span>للطلاب</span></summary>
-            <div className="qz-set-row qz-stacked">
-                <p className="qz-set-detail">دي تعليمات امتحان المزاولة الحقيقي، مش قواعد الكويز ده.</p>
-                <ul className="qz-info-list">{infoConfirmed.map(t=><li key={t}>{t}</li>)}</ul>
-            </div>
-        </details>
-    </>;
-}
-
-function LearnPanels({wrongSet,flagged,history,startRun,mode}:{wrongSet:Set<number>;flagged:number[];history:Attempt[];startRun:(r:Run)=>void;mode:Mode}) {
-    const [scope,setScope] = useState('all');
-    const wrongBanks = banks.map(b=>({b,n:b.ids.filter(i=>wrongSet.has(i)).length})).filter(x=>x.n>0);
-    const scopeOk = scope==='all' || wrongBanks.some(x=>x.b.id===scope);
-    const sc = scopeOk?scope:'all';
-    const wrongIds = (sc==='all'?[...wrongSet]:banks.find(b=>b.id===sc)!.ids.filter(i=>wrongSet.has(i))).sort((a,b)=>a-b);
-    const flagIds = [...flagged].sort((a,b)=>a-b);
-    const keys = Array.from(new Set(history.map(h=>h.b)));
-    const rows = keys.map(k=>{
-        const hs = history.filter(h=>h.b===k); const pct = (h:Attempt)=>h.n?Math.round(h.r/h.n*100):0;
-        const last = hs[hs.length-1]; const prev = hs.length>1?hs[hs.length-2]:null;
-        return {k,hs,last:pct(last),best:Math.max(...hs.map(pct)),delta:prev?pct(last)-pct(prev):null,recent:hs.slice(-5).map(pct)};
-    }).sort((a,b)=>a.last-b.last);
-    const totalR = history.reduce((a,h)=>a+h.r,0); const totalN = history.reduce((a,h)=>a+h.n,0);
-    return <>
-        <details className="qz-set-group"><summary>دفتر الغلطات <span>{toAr(String(wrongSet.size))} سؤال</span></summary>
-            <div className="qz-set-row qz-stacked">
-                {wrongSet.size===0?<p className="qz-set-detail">مفيش أسئلة غلط لسه. أي إجابة غلط هتتضاف هنا تلقائيًا.</p>:<>
-                <label className="qz-set-label" htmlFor="nb-scope">من أي بنك</label>
-                <select id="nb-scope" className="qz-bank-input" value={sc} onChange={e=>setScope(e.target.value)}><option value="all">كل الكويزات · {toAr(String(wrongSet.size))}</option>{wrongBanks.map(x=><option key={x.b.id} value={x.b.id}>{x.b.name} · {toAr(String(x.n))}</option>)}</select>
-                <p className="qz-set-detail">الإجابة الصح هنا بتشيل السؤال من الدفتر.</p>
-                <button type="button" className="qz-btn primary" onClick={()=>startRun({kind:'notebook',ids:wrongIds})}>ذاكر الغلطات ({toAr(String(wrongIds.length))})</button></>}
-            </div>
-        </details>
-        <details className="qz-set-group"><summary>راجعني <span>{toAr(String(flagIds.length))} سؤال</span></summary>
-            <div className="qz-set-row qz-stacked">
-                {flagIds.length===0?<p className="qz-set-detail">علّم أي سؤال بزر العلم أثناء الحل وهيظهر هنا.</p>:<button type="button" className="qz-btn primary" onClick={()=>startRun({kind:'flagged',ids:flagIds})}>راجع الأسئلة المعلّمة ({toAr(String(flagIds.length))})</button>}
-            </div>
-        </details>
-        <details className="qz-set-group"><summary>مستواك <span>{toAr(String(history.length))} محاولة</span></summary>
-            {history.length===0?<div className="qz-set-row"><p className="qz-set-detail">سلّم أول تجربة وهتظهر نسبتك لكل بنك هنا.</p></div>:<>
-            <div className="qz-set-row"><div><span className="qz-set-label">المتوسط العام</span><p className="qz-set-detail">{toAr(String(totalN?Math.round(totalR/totalN*100):0))}٪ صح في {toAr(String(history.length))} محاولة. الأضعف فوق.</p></div></div>
-            {rows.map(r=><div className="qz-set-row qz-stat" key={r.k}>
-                <div className="qz-stat-head"><span className="qz-set-label">{runLabel(r.k)}</span><span className="qz-stat-last"><bdi>{toAr(String(r.last))}٪</bdi></span></div>
-                <p className="qz-set-detail">{toAr(String(r.hs.length))} محاولة · أحسن نتيجة <bdi>{toAr(String(r.best))}٪</bdi>{r.delta!==null&&<> · عن اللي قبلها <bdi dir="ltr">{r.delta>0?'+':''}{toAr(String(r.delta))}٪</bdi></>}</p>
-                <div className="qz-spark" aria-label="آخر المحاولات">{r.recent.map((v,i)=><span key={i} className="qz-spark-bar" style={{height:`${Math.max(6,v*0.36)}px`}} title={`${v}%`}><i>{toAr(String(v))}</i></span>)}</div>
-            </div>)}</>}
-        </details>
-    </>;
-}
 
 function BackupPanel({make,restore}:{make:()=>Promise<string>;restore:(code:string)=>Promise<string>}) {
     const [code,setCode] = useState('');
@@ -481,7 +436,7 @@ function MockApp() {
     const [autoPending,setAutoPending] = useState(false);
     const [celebrate,setCelebrate] = useState(false);
     const [burst,setBurst] = useState(0);
-    const burstPieces=React.useMemo(()=>Array.from({length:26},(_,i)=>({left:(i*37+13)%100,delay:(i%9)*0.06,duration:1.6+(i%5)*0.25,color:['#0b4f4a','#e4f5a4','#7fd08a','#ffffff','#c9ef6b'][i%5],size:6+(i%3)*3})),[]);
+    const burstPieces=React.useMemo(()=>Array.from({length:12},(_,i)=>({left:(i*37+13)%100,delay:(i%9)*0.04,duration:1.0+(i%5)*0.15,color:['#0b4f4a','#e4f5a4','#7fd08a','#ffffff','#c9ef6b'][i%5],size:6+(i%3)*3})),[]);
     const panel=useRef<HTMLDialogElement>(null);const scroller=useRef<HTMLDivElement>(null);
     const [attemptKey,setAttemptKey]=useState(0);
     // S2-5: the clock ticks every second on screen, but localStorage is written at most every 10s (pause/answer/submit flush it).
@@ -532,7 +487,15 @@ function MockApp() {
         }
         update({submitted:true,resultElapsed:liveElapsed,elapsed:liveElapsed,tab:'home'});setReview('all');
     };
-    const begin=(run?:Run)=>{const setup=state.setup;const nextIds=run?run.ids:(banks.find(b=>b.id===setup.section)||banks[0]).ids;if(!nextIds.length)return;setReview('all');setCelebrate(false);setAttemptKey(k=>k+1);update({run:run?run.kind:'all',bank:run?run.kind:setup.section,ids:nextIds,picked:questions.map(()=>null),index:nextIds[0],elapsed:0,paused:false,started:true,submitted:false,resultElapsed:null,mode:setup.mode,tab:'quiz'});setConfirmAction(null);};
+    const begin=(run?:Run,section?:string)=>{const setup=state.setup;const sec=section??setup.section;const nextIds=run?run.ids:(banks.find(b=>b.id===sec)||banks[0]).ids;if(!nextIds.length)return;setReview('all');setCelebrate(false);setAttemptKey(k=>k+1);update({run:run?run.kind:'all',bank:run?run.kind:sec,ids:nextIds,picked:questions.map(()=>null),index:nextIds[0],elapsed:0,paused:false,started:true,submitted:false,resultElapsed:null,mode:setup.mode,tab:'quiz'});setConfirmAction(null);};
+    // Round 4: tapping an exam card starts that exam in the chosen mode — or
+    // resumes it when it is the live session (mirrors Android onExamCard).
+    const onCard=(b:typeof banks[number])=>{
+        if(started&&!submitted&&state.run==='all'&&(state.bank??state.setup.section)===b.id){open('all');return;}
+        update({setup:{section:b.id,mode:state.setup.mode},settings:{...state.settings,minutes:b.minutes}});
+        if(started){setPendingRun(null);setConfirmAction('start');}
+        else begin(undefined,b.id);
+    };
     // Phase 1: always ask before finishing — even with no blank questions — so a stray tap cannot end the attempt.
     const finish=()=>{setConfirmAction('finish');};
     const reset=()=>{setReview('all');setCelebrate(false);setAttemptKey(k=>k+1);update({started:false,submitted:false,resultElapsed:null,picked:questions.map(()=>null),elapsed:0,index:0,paused:false,tab:'home'});};
@@ -544,8 +507,10 @@ function MockApp() {
         if(remaining===300&&settings.minutes*60>300&&!warnFired.current.m5){warnFired.current={...warnFired.current,m5:true};}
     },[remaining,settings.sounds,settings.countdown,settings.minutes,started,submitted,paused]);
     // S3-1: leaving the result screen must not wipe it; a new attempt only starts when the user explicitly begins one.
-    const goHome=()=>{setConfirmAction(null);update({tab:'home'});};
-    const open=(filter:string)=>{setReview(filter);const list=filter==='wrong'?ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c):ids;update({tab:'quiz',index:list.includes(index)?index:(list[0]??index)});};
+    // Round 4: going home from a live quiz pauses it — the clock used to keep
+    // ticking while the user thought he had left (same fix as Android goToList).
+    const goHome=()=>{setConfirmAction(null);update({tab:'home',paused:started&&!submitted?true:paused});};
+    const open=(filter:string)=>{setReview(filter);const list=filter==='wrong'?ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c):ids;update({tab:'quiz',paused:started&&!submitted?false:paused,index:list.includes(index)?index:(list[0]??index)});};
         const makeBackup = async (): Promise<string> => {
         const json = JSON.stringify({v:1,s:stored,x:extra});
         const raw = new TextEncoder().encode(json);
@@ -582,7 +547,7 @@ function MockApp() {
         <div className="qz-launch" hidden={opened} dir="rtl"><h2><QuizBrand/></h2><p>اختار الاختبار وكمّل من مكانك.</p><button type="button" className="qz-btn primary" onClick={() => setOpened(true)}>افتح التجربة</button></div>
         <dialog ref={panel} className="qz-app-dialog" onCancel={(e) => { if (e.target === e.currentTarget) { if (tab!=='home') { e.preventDefault(); goHome(); } else setOpened(false); } }} onClose={(e) => { if (e.target === e.currentTarget) setOpened(false); }} dir="rtl">
         <div className={screenCls+(tab==='quiz'&&started?' qz-is-solving':'')} style={{'--qz-scale':fontPercent(settings)/100} as React.CSSProperties} aria-label="Quiz Hub، أسئلة مزاولة المهنة">
-            <header className="qz-app-head"><QuizBrand compact={tab==='quiz'&&started}/>{tab==='quiz'&&started&&settings.timer&&<TimerChip elapsed={settings.countdown?remaining:liveElapsed} countdown={settings.countdown}/>}<CloseButton label="قفل التجربة" onClick={() => { if (tab!=='home') goHome(); else setOpened(false); }} /></header>
+            <header className="qz-app-head"><QuizBrand compact={tab==='quiz'&&started}/>{tab==='quiz'&&started&&<button type="button" className="qz-btn ghost qz-list-btn" onClick={goHome}>‹ القائمة</button>}{tab==='quiz'&&started&&settings.timer&&<TimerChip elapsed={settings.countdown?remaining:liveElapsed} countdown={settings.countdown}/>}<CloseButton label="قفل التجربة" onClick={() => { if (tab!=='home') goHome(); else setOpened(false); }} /></header>
             {burst>0&&<div className="qz-confetti" key={burst} aria-hidden="true" data-testid="burst">{burstPieces.map((p,i)=><i key={i} style={{left:`${p.left}%`,width:p.size,height:p.size*1.4,background:p.color,animationDelay:`${p.delay}s`,animationDuration:`${p.duration}s`}}/>)}</div>}
             <div className="qz-scroll" ref={scroller}>
             {!(tab==='quiz'&&started)&&<div className="qz-topbar">
@@ -593,7 +558,7 @@ function MockApp() {
             {<>
             {(paused||(allAnswered&&state.mode==='study')||expired||submitted)&&started&&<p className="qz-clock-status">{expired?'الوقت خلص':submitted?'تم التسليم، العداد متوقف':allAnswered?'اكتملت الاختيارات، العداد متوقف':'العداد متوقف مؤقتًا'}</p>}
             {confirmAction&&<div className="qz-hint qz-confirm-box" role="alert"><p>{confirmAction==='finish'?(ids.some(id=>picked[id]===null)?'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟':'كل الأسئلة مجاوبة. تسلّم دلوقتي وتعرض النتيجة؟'):'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p><div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={()=>{if(confirmAction==='start')begin(pendingRun??undefined);else{doSubmit();setConfirmAction(null);}}}>{confirmAction==='start'?'ابدأ من جديد':'سلّم التجربة'}</button><button type="button" className="qz-btn ghost" onClick={()=>setConfirmAction(null)}>رجوع</button></div></div>}
-            {tab==='home'&&<HomeScreen state={{...state,elapsed:liveElapsed}} update={update} start={()=>{setPendingRun(null);if(started)setConfirmAction('start');else begin();}} open={open} finish={finish} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r=>{if(started){setPendingRun(r);setConfirmAction('start');}else begin(r);}}/>}
+            {tab==='home'&&<HomeScreen state={{...state,elapsed:liveElapsed}} update={update} onCard={onCard} open={open} finish={finish} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r=>{if(started){setPendingRun(r);setConfirmAction('start');}else begin(r);}}/>}
             {tab==='quiz'&&started&&<QuizScreen state={{...state,index:safeIndex}} update={update} viewIds={viewIds} jump={id=>update({index:id})} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome} attemptKey={attemptKey}/>}
             {tab==='quiz'&&!started&&<div className="qz-home"><p>اختار طريقة التجربة من الرئيسية الأول.</p><button type="button" className="qz-btn primary" onClick={()=>update({tab:'home'})}>إعداد التجربة</button></div>}
             {tab==='settings'&&<SettingsScreen backup={{make:makeBackup,restore:restoreBackup}} settings={settings} setSettings={v=>update({settings:v})} onReset={reset} paused={paused} setPaused={v=>update({paused:v})} resetClock={()=>update({elapsed:0})}/>}

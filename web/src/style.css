@@ -100,7 +100,7 @@ body { background: var(--ds-page); }
     transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.qz-fx .qz-stage { animation: qz-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.qz-fx .qz-stage { animation: qz-rise 0.12s cubic-bezier(0.22, 1, 0.36, 1); }
 
 .qz-question { margin-top: 14px; }
 .qz-q-en { margin: 0; font-size: 17px; line-height: 1.45; font-weight:600; color: #0b3f3b; text-align: left; letter-spacing: -0.005em; }
@@ -154,7 +154,7 @@ body { background: var(--ds-page); }
 .qz-opt.is-wrong { background: var(--qz-red-soft); border-color: var(--qz-red); }
 .qz-opt.is-wrong .qz-letter { background: var(--qz-red); border-color: var(--qz-red); color: #fff; }
 .qz-opt.is-wrong .qz-mark { color: var(--qz-red); }
-.qz-opt.is-correct, .qz-opt.is-wrong { animation: qz-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
+.qz-opt.is-correct, .qz-opt.is-wrong { animation: qz-pop 0.12s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes qz-pop { 0% { transform: scale(0.985); } 60% { transform: scale(1.012); } 100% { transform: none; } }
 
 
@@ -229,7 +229,7 @@ body { background: var(--ds-page); }
 .qz-tab:focus-visible { outline: 2px solid var(--qz-teal); outline-offset: 2px; border-radius: 12px; }
 
 /* Home + Settings screens */
-.qz-home { animation: qz-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.qz-home { animation: qz-rise 0.12s cubic-bezier(0.22, 1, 0.36, 1); }
 .qz-home-title { margin: 18px 0 2px; font-size: 19px; font-weight:600; color: #0b3f3b; }
 .qz-home-sub { margin: 0 0 14px; font-size: 12.5px; font-weight: 700; color: #2f6a5f; }
 .qz-home-cards { display: flex; gap: 10px; }
@@ -245,7 +245,7 @@ body { background: var(--ds-page); }
 .qz-home-time { display: flex; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 13px; font-weight:600; color: #0b4f4a; }
 .qz-home-cta { width: 100%; margin-top: 14px; }
 
-.qz-settings { animation: qz-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.qz-settings { animation: qz-rise 0.12s cubic-bezier(0.22, 1, 0.36, 1); }
 .qz-settings-title { margin: 18px 0 12px; font-size: 18px; font-weight:600; color: #0b3f3b; }
 .qz-set-row {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -386,11 +386,25 @@ body { background: var(--ds-page); }
 .qz-bank-search { margin-bottom: 10px; }
 .qz-bank-list { display:flex; flex-direction:column; gap:10px; }
 .qz-bank-group-label { margin:2px 0 0; font-size:12px; font-weight:700; color:#2f6a5f; }
-.qz-bank-opt { font:inherit; width:100%; text-align:start; min-height:46px; padding:10px 14px; border-radius:12px; border:1.5px solid rgba(11,79,74,.3); background:rgba(255,255,255,.55); color:#0b3f3b; font-size:13px; font-weight:600; cursor:pointer; }
-.qz-bank-opt.is-on { background:#0b4f4a; border-color:#0b4f4a; color:#e4f5a4; }
 .qz-dark .qz-bank-group-label { color:#b9d5b4; }
-.qz-dark .qz-bank-opt { background:#17483e; border-color:#cfe98a44; color:#eef6db; }
-.qz-dark .qz-bank-opt.is-on { background:#cfe98a; border-color:#cfe98a; color:#092f2c; }
+/* Round 4: exam cards (2 per row) on home — mirrors the Android examCard grid. */
+.qz-exam-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:8px; }
+.qz-exam-card { font:inherit; display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:start; min-height:96px; padding:12px 14px; border-radius:16px; border:1.5px solid rgba(11,79,74,.2); background:rgba(255,255,255,.65); color:#0b3f3b; cursor:pointer; }
+.qz-exam-card-name { font-size:14.5px; font-weight:700; color:#0b3f3b; }
+.qz-exam-card-meta { font-size:12px; font-weight:500; color:#2f6a5f; }
+.qz-exam-card-status { font-size:12px; font-weight:700; color:#2f6a5f; }
+.qz-exam-card.is-on { border-color:#0b4f4a; box-shadow:0 0 0 1px #0b4f4a; }
+.qz-exam-card.is-live { background:#0b4f4a; border-color:#0b4f4a; }
+.qz-exam-card.is-live .qz-exam-card-name, .qz-exam-card.is-live .qz-exam-card-meta, .qz-exam-card.is-live .qz-exam-card-status { color:#e4f5a4; }
+.qz-dark .qz-exam-card { background:#17483e; border-color:#cfe98a33; }
+.qz-dark .qz-exam-card-name { color:#eef6db; }
+.qz-dark .qz-exam-card-meta, .qz-dark .qz-exam-card-status { color:#b9d5b4; }
+.qz-dark .qz-exam-card.is-on { border-color:#cfe98a; box-shadow:0 0 0 1px #cfe98a; }
+.qz-dark .qz-exam-card.is-live { background:#cfe98a; border-color:#cfe98a; }
+.qz-dark .qz-exam-card.is-live .qz-exam-card-name, .qz-dark .qz-exam-card.is-live .qz-exam-card-meta, .qz-dark .qz-exam-card.is-live .qz-exam-card-status { color:#092f2c; }
+.qz-learn-row { display:flex; gap:10px; }
+.qz-learn-row .qz-btn { flex:1; padding:8px 12px; }
+.qz-list-btn { min-height:36px; padding:4px 12px; font-size:12.5px; }
 .qz-question-map {display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:10px;padding:8px 0;}
 .qz-question-map .qz-dot {width:44px;height:44px;font-size:12px;}
 .qz-map-trigger {margin-top:12px;}
@@ -487,7 +501,7 @@ body { background: var(--ds-page); }
 .qz-brand-purpose {text-align:start;}
 
 /* Sound & motion effects (gen20) */
-.qz-fx .qz-opt.is-pending { animation: qz-press 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+.qz-fx .qz-opt.is-pending { animation: qz-press 0.12s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes qz-press { 0% { transform: scale(0.965); } 55% { transform: scale(1.012); } 100% { transform: none; } }
 .qz-bravo { margin: 10px 0 0; font-size: 16px; font-weight: 700; color: #0b4f4a; text-align: center; }
 .qz-dark .qz-bravo { color: #e4f5a4; }
