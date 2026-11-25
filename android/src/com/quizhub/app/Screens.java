@@ -90,192 +90,15 @@ final class Screens {
             else inProgressCard(a, c);
         }
 
-        // setup group: web renders <details open={!started}>, so collapse while a session/result is live
-        boolean open = a.setupOpen != null ? a.setupOpen : !s.started;
-        LinearLayout trow = new LinearLayout(a);
-        trow.setOrientation(LinearLayout.HORIZONTAL);
-        trow.setGravity(Gravity.CENTER_VERTICAL);
-        trow.setMinimumHeight(dp(a,48));
-        trow.addView(homeTitle(a, s.started ? "تجربة جديدة" : "إعداد التجربة"), new LinearLayout.LayoutParams(0,-2,1f));
-        TextView arrow = Ui.tv(a, open ? "▾" : "◂", 16, t.dispB(), t.muted());
-        trow.addView(arrow);
-        trow.setOnClickListener(v -> { a.setupOpen = !open; a.renderAll(); });
-        add(c, trow, 16);
-        if (!open) { learnPanels(a, c); infoPanels(a, c); return; }
-        add(c, label(a, "الاختبار أو البنك"), 10);
-        bankPicker(a, c);
-        add(c, label(a, "طريقة التجربة"), 14);
+        // Round 4: home is cards only — no collapsible setup row, no instruction
+        // panels. Mode first (it applies to whichever card you tap), then
+        // search, then the exam cards. Notebook / flagged live as compact
+        // action cards above the search (see examCards()).
         modeSeg(a, c);
-        add(c, detail(a, s.setupMode.equals("study")
-            ? "تصحيح فوري، مع التلميح والشرح حسب إعداداتك."
-            : "من غير تلميحات أو تصحيح أو شرح لحد التسليم. تقدر تغيّر إجابتك قبل النهاية."), 6);
-        Button start = btn(a, "ابدأ تجربة " + (s.setupMode.equals("study")?"مذاكرة":"امتحان"), true);
-        start.setOnClickListener(v -> { if (s.started) { a.confirmAction = "start"; a.renderAll(); } else a.begin(); });
-        add(c, start, 14);
-        learnPanels(a, c);
-        infoPanels(a, c);
+        examCards(a, c);
     }
 
     static String pctTxt(int p) { return Ui.toAr(String.valueOf(p)) + "٪"; }
-    static void panelTitle(MainActivity a, LinearLayout c, String title, String count) {
-        LinearLayout r = new LinearLayout(a);
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        r.addView(Ui.tv(a, title, 18, a.theme.dispB(), a.theme.head()), new LinearLayout.LayoutParams(0,-2,1f));
-        TextView cnt = Ui.tv(a, count, 12.5f, a.theme.dispB(), a.theme.muted());
-        LinearLayout.LayoutParams cpp = new LinearLayout.LayoutParams(-2, -2);
-        cpp.leftMargin = dp(a, 12);
-        r.addView(cnt, cpp);
-        add(c, r, 22);
-    }
-    static final String[] INFO_CONFIRMED = {"الامتحان 100 سؤال اختيار من متعدد، وزمنه لا يتجاوز 3 ساعات.",
-            "النتيجة نجاح أو رسوب (Pass or Fail) من غير درجات.",
-            "الدخول من لابتوب أو كمبيوتر فيه كاميرا (USB)، والكاميرا تشتغل طول الامتحان.",
-            "ارفع صورة شخصية بخلفية بيضاء قبل أي امتحان، وإلا ممكن يتلغي الامتحان أو يتعلّق البروفايل.",
-            "اقعد لوحدك في مكان هادي ومنعزل وبشكل لائق طول الامتحان.",
-            "ادخل الموقع قبل الميعاد بـ20 دقيقة على الأقل.",
-            "ممنوع فتح أي متصفح أو موقع تاني، أو استخدام أجهزة تانية أو سماعات خارجية، والمخالفة بتلغي الامتحان.",
-            "في كل دور 3 امتحانات فعلية، تنجح في أي واحد منهم، والمحسوب آخر امتحان تدخله. لو نجحت من أول مرة الأفضل ما تدخلش تاني."};
-
-    static void bullets(MainActivity a, LinearLayout c, String[] items, boolean numbered) {
-        Theme t = a.theme;
-        for (int i = 0; i < items.length; i++) {
-            TextView tv = Ui.tv(a, (numbered ? Ui.toAr(String.valueOf(i + 1)) + ". " : "• ") + items[i], 13.5f, t.body(), t.ink());
-            tv.setLineSpacing(0, 1.5f);
-            add(c, tv, 6);
-        }
-    }
-    static void infoPanels(MainActivity a, LinearLayout c) {
-        // S3-10: collapsible (exam panel open by default, matching web <details open>); S4-3: the
-        // unconfirmed stats (60٪ pass rate, question split) and the stale July 2024 payment panel are
-        // removed entirely — Mohamed's rule: no verification wording or unconfirmed numbers in the UI.
-        infoHeader(a, c, "تعليمات الامتحان الفعلي", "للطلاب", a.infoExamOpen, () -> { a.infoExamOpen = !a.infoExamOpen; a.renderAll(); });
-        if (a.infoExamOpen) {
-            add(c, detail(a, "دي تعليمات امتحان المزاولة الحقيقي، مش قواعد الكويز ده."), 6);
-            bullets(a, c, INFO_CONFIRMED, false);
-        }
-    }
-
-    /** Collapsible section header with a chevron (used by the info panels). */
-    static void infoHeader(MainActivity a, LinearLayout c, String title, String count, boolean open, Runnable toggle) {
-        LinearLayout trow = new LinearLayout(a);
-        trow.setOrientation(LinearLayout.HORIZONTAL);
-        trow.setGravity(Gravity.CENTER_VERTICAL);
-        trow.setMinimumHeight(dp(a,48));
-        trow.addView(Ui.tv(a, title, 18, a.theme.dispB(), a.theme.head()), new LinearLayout.LayoutParams(0,-2,1f));
-        TextView cnt = Ui.tv(a, count, 12.5f, a.theme.dispB(), a.theme.muted());
-        LinearLayout.LayoutParams cpp = new LinearLayout.LayoutParams(-2, -2);
-        cpp.leftMargin = dp(a, 12);
-        trow.addView(cnt, cpp);
-        trow.addView(Ui.tv(a, open ? "▾" : "◂", 16, a.theme.dispB(), a.theme.muted()));
-        trow.setOnClickListener(v -> toggle.run());
-        add(c, trow, 22);
-    }
-
-    static void learnPanels(MainActivity a, LinearLayout c) {
-        Session s = a.s; Theme t = a.theme;
-        // ---- notebook ----
-        panelTitle(a, c, "دفتر الغلطات", Ui.toAr(String.valueOf(s.wrong.size())) + " سؤال");
-        if (s.wrong.isEmpty()) add(c, detail(a, "مفيش أسئلة غلط لسه. أي إجابة غلط هتتضاف هنا تلقائيًا."), 6);
-        else {
-            final String[] scope = { "all" };
-            java.util.List<String> keys = new java.util.ArrayList<>(); java.util.List<String> names = new java.util.ArrayList<>();
-            keys.add("all"); names.add("كل الكويزات · " + Ui.toAr(String.valueOf(s.wrong.size())));
-            for (Bank.BankMeta m : a.bank.banks) {
-                int n = 0; for (int g : m.ids) if (s.wrong.contains(g)) n++;
-                if (n > 0) { keys.add(m.id); names.add(m.name + " · " + Ui.toAr(String.valueOf(n))); }
-            }
-            TextView sel = Ui.tv(a, names.get(0) + "  ▾", 13, t.bodyB(), t.dark ? Theme.D_OPTTEXT : Theme.L_TEAL);
-            sel.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-            sel.setPadding(dp(a,14),0,dp(a,14),0);
-            sel.setBackground(Ui.roundStroke(t.card55(), dp(a,12), t.dark?Theme.D_BORDER4:0x550b4f4a, dp(a,1)));
-            final Button go = btn(a, "ذاكر الغلطات (" + Ui.toAr(String.valueOf(s.wrong.size())) + ")", true);
-            sel.setOnClickListener(v -> new android.app.AlertDialog.Builder(a).setItems(names.toArray(new String[0]), (d, pos) -> {
-                scope[0] = keys.get(pos); sel.setText(names.get(pos) + "  ▾");
-                go.setText("ذاكر الغلطات (" + Ui.toAr(String.valueOf(wrongIds(a, scope[0]).length)) + ")");
-            }).show());
-            add(c, label(a, "من أي بنك"), 8);
-            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(a,46)); sp.topMargin = dp(a,6);
-            c.addView(sel, sp);
-            add(c, detail(a, "الإجابة الصح هنا بتشيل السؤال من الدفتر."), 6);
-            go.setOnClickListener(v -> a.startRun("notebook", wrongIds(a, scope[0])));
-            add(c, go, 10);
-        }
-        // ---- flagged ----
-        panelTitle(a, c, "راجعني", Ui.toAr(String.valueOf(s.favorites.size())) + " سؤال");
-        if (s.favorites.isEmpty()) add(c, detail(a, "علّم أي سؤال بزر العلم أثناء الحل وهيظهر هنا."), 6);
-        else {
-            Button fb = btn(a, "راجع الأسئلة المعلّمة (" + Ui.toAr(String.valueOf(s.favorites.size())) + ")", true);
-            fb.setOnClickListener(v -> { int[] ids = new int[s.favorites.size()]; int i = 0; for (int g : s.favorites) ids[i++] = g; a.startRun("flagged", ids); });
-            add(c, fb, 10);
-        }
-        // ---- history ----
-        int hn = s.history.length();
-        panelTitle(a, c, "مستواك", Ui.toAr(String.valueOf(hn)) + " محاولة");
-        if (hn == 0) { add(c, detail(a, "سلّم أول تجربة وهتظهر نسبتك لكل بنك هنا."), 6); return; }
-        int tr = 0, tn = 0;
-        java.util.LinkedHashMap<String, java.util.List<int[]>> by = new java.util.LinkedHashMap<>();
-        try {
-            for (int i = 0; i < hn; i++) {
-                org.json.JSONObject e = s.history.getJSONObject(i);
-                tr += e.getInt("r"); tn += e.getInt("n");
-                String k = e.getString("b");
-                if (!by.containsKey(k)) by.put(k, new java.util.ArrayList<int[]>());
-                by.get(k).add(new int[]{ e.getInt("r"), e.getInt("n") });
-            }
-        } catch (Exception ignore) {}
-        add(c, detail(a, "المتوسط العام: " + pctTxt(tn > 0 ? Math.round(tr * 100f / tn) : 0) + " صح في " + Ui.toAr(String.valueOf(hn)) + " محاولة. الأضعف فوق."), 6);
-        java.util.List<String> order = new java.util.ArrayList<>(by.keySet());
-        final java.util.Map<String,Integer> lastPct = new java.util.HashMap<>();
-        for (String k : order) { java.util.List<int[]> h = by.get(k); int[] l = h.get(h.size()-1); lastPct.put(k, l[1]>0?Math.round(l[0]*100f/l[1]):0); }
-        java.util.Collections.sort(order, (x, y) -> lastPct.get(x) - lastPct.get(y));
-        for (String k : order) {
-            java.util.List<int[]> h = by.get(k); int best = 0;
-            for (int[] x : h) best = Math.max(best, x[1]>0?Math.round(x[0]*100f/x[1]):0);
-            String line = Ui.toAr(String.valueOf(h.size())) + " محاولة · أحسن نتيجة " + pctTxt(best);
-            if (h.size() > 1) { int[] p = h.get(h.size()-2); int pp = p[1]>0?Math.round(p[0]*100f/p[1]):0; int d = lastPct.get(k) - pp; line += " · عن اللي قبلها " + (d>0?"+":"") + Ui.toAr(String.valueOf(d)) + "٪"; }
-            LinearLayout row = new LinearLayout(a);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            row.addView(Ui.tv(a, a.runLabel(k), 14, t.bodyB(), t.bodyColor()), new LinearLayout.LayoutParams(0,-2,1f));
-            TextView lastTv = Ui.tv(a, Ui.lre(pctTxt(lastPct.get(k))), 15, t.dispB(), t.head());
-            lastTv.setTextDirection(View.TEXT_DIRECTION_LTR);
-            LinearLayout.LayoutParams ltp = new LinearLayout.LayoutParams(-2, -2);
-            ltp.leftMargin = dp(a, 10);
-            row.addView(lastTv, ltp);
-            add(c, row, 12);
-            add(c, detail(a, line), 2);
-            LinearLayout spark = new LinearLayout(a);
-            spark.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            spark.setOrientation(LinearLayout.HORIZONTAL);
-            spark.setGravity(Gravity.BOTTOM);
-            spark.setMinimumHeight(dp(a, 44));
-            int from = Math.max(0, h.size() - 5);
-            for (int bi = from; bi < h.size(); bi++) {
-                int[] x = h.get(bi);
-                int v = x[1] > 0 ? Math.round(x[0] * 100f / x[1]) : 0;
-                LinearLayout col = new LinearLayout(a);
-                col.setOrientation(LinearLayout.VERTICAL);
-                col.setGravity(Gravity.CENTER_HORIZONTAL);
-                TextView lab = Ui.tv(a, Ui.toAr(String.valueOf(v)), 10, t.bodyB(), t.bodyColor());
-                lab.setGravity(Gravity.CENTER);
-                col.addView(lab, new LinearLayout.LayoutParams(-1, -2));
-                View bar = new View(a);
-                float r = dp(a, 8), r2 = dp(a, 3);
-                android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-                gd.setColor(t.dark ? 0xffc9ef6b : 0xff0b4f4a);
-                gd.setCornerRadii(new float[]{r, r, r, r, r2, r2, r2, r2});
-                bar.setBackground(gd);
-                col.addView(bar, new LinearLayout.LayoutParams(dp(a, 30), dp(a, Math.max(6f, v * 0.36f))));
-                LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, -2);
-                cp.rightMargin = dp(a, 6);
-                spark.addView(col, cp);
-            }
-            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-2, -2);
-            sp.topMargin = dp(a, 8);
-            c.addView(spark, sp);
-        }
-    }
     static int[] wrongIds(MainActivity a, String scope) {
         java.util.ArrayList<Integer> out = new java.util.ArrayList<>();
         if (scope.equals("all")) out.addAll(a.s.wrong);
@@ -319,11 +142,32 @@ final class Screens {
         add(c, box, 10);
     }
 
-    /** S4-5: in-page grouped bank picker with search (web parity), replacing the flat AlertDialog list.
-     *  Banks stay grouped by their index.json group ("tests" first); tapping one selects it and its minutes.
-     *  The search filters the list in place (no full re-render) so the keyboard and focus survive typing. */
-    static void bankPicker(MainActivity a, LinearLayout c) {
+    /** Round 4: the exam list is a grid of cards (2 per row) — one card per exam
+     *  with the name, question count and a small status. Tapping a card starts
+     *  that exam in the chosen mode (or resumes it when it is the live session);
+     *  a live session for another exam asks for confirmation first.
+     *  The search filters the grid in place (no full re-render) so the keyboard
+     *  and focus survive typing. Group labels stay as small section headers. */
+    static void examCards(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme;
+        // compact notebook / flagged actions — the only way to start those runs
+        if (!s.wrong.isEmpty() || !s.favorites.isEmpty()) {
+            LinearLayout row = new LinearLayout(a);
+            row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            if (!s.wrong.isEmpty()) {
+                Button nb = btn(a, "دفتر الغلطات (" + Ui.toAr(String.valueOf(s.wrong.size())) + ")", true);
+                nb.setOnClickListener(v -> a.startRun("notebook", wrongIds(a, "all")));
+                row.addView(nb, new LinearLayout.LayoutParams(0, -2, 1f));
+            }
+            if (!s.favorites.isEmpty()) {
+                Button fb = btn(a, "راجعني (" + Ui.toAr(String.valueOf(s.favorites.size())) + ")", true);
+                fb.setOnClickListener(v -> { int[] ids = new int[s.favorites.size()]; int i = 0; for (int g : s.favorites) ids[i++] = g; a.startRun("flagged", ids); });
+                LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(0, -2, 1f);
+                if (!s.wrong.isEmpty()) fp.setMargins(dp(a, 10), 0, 0, 0);
+                row.addView(fb, fp);
+            }
+            add(c, row, 14);
+        }
         android.widget.EditText search = new android.widget.EditText(a);
         search.setHint("ابحث عن بنك…");
         search.setText(a.bankQuery);
@@ -341,13 +185,13 @@ final class Screens {
         search.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence ch, int st, int co, int af) {}
             @Override public void onTextChanged(CharSequence ch, int st, int be, int co) {}
-            @Override public void afterTextChanged(android.text.Editable e) { a.bankQuery = e.toString(); fillBankList(a, list); }
+            @Override public void afterTextChanged(android.text.Editable e) { a.bankQuery = e.toString(); fillExamCards(a, list); }
         });
-        fillBankList(a, list);
+        fillExamCards(a, list);
         add(c, list, 4);
     }
 
-    static void fillBankList(MainActivity a, LinearLayout list) {
+    static void fillExamCards(MainActivity a, LinearLayout list) {
         Session s = a.s; Theme t = a.theme;
         list.removeAllViews();
         java.util.LinkedHashMap<String, java.util.List<Bank.BankMeta>> groups = new java.util.LinkedHashMap<>();
@@ -360,24 +204,65 @@ final class Screens {
         for (java.util.Map.Entry<String, java.util.List<Bank.BankMeta>> e : groups.entrySet()) {
             int totalQ = 0; for (Bank.BankMeta m : e.getValue()) totalQ += m.ids.length;
             add(list, Ui.tv(a, (e.getKey().equals("tests") ? "الاختبارات" : e.getKey()) + " · " + Ui.toAr(String.valueOf(totalQ)) + " سؤال", 12, t.dispB(), t.muted()), 10);
-            for (Bank.BankMeta m : e.getValue()) {
+            for (int i = 0; i < e.getValue().size(); i += 2) {
                 any = true;
-                boolean on = m.id.equals(s.setupSection);
-                Button b = new Button(a);
-                b.setText(m.name + " · " + Ui.toAr(String.valueOf(m.ids.length)) + " سؤال");
-                b.setAllCaps(false); b.setTextSize(13); b.setTypeface(t.disp());
-                b.setMinHeight(dp(a,46)); b.setMinimumHeight(dp(a,46));
-                b.setStateListAnimator(null);
-                b.setPadding(dp(a,14), dp(a,8), dp(a,14), dp(a,8));
-                b.setBackground(Ui.roundStroke(on ? t.primary() : t.card55(), dp(a,12), on ? t.primary() : t.border3(), dp(a,1.5f)));
-                b.setTextColor(on ? t.onAccent() : t.ink());
-                b.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-                final Bank.BankMeta fm = m;
-                b.setOnClickListener(v -> { if (!fm.id.equals(s.setupSection)) { s.setupSection = fm.id; s.minutes = fm.minutes; a.save(); } a.renderAll(); });
-                add(list, b, 6);
+                LinearLayout row = new LinearLayout(a);
+                row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+                for (int j = i; j < Math.min(i + 2, e.getValue().size()); j++) {
+                    LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
+                    if (j > i) cp.setMargins(dp(a, 10), 0, 0, 0);
+                    row.addView(examCard(a, e.getValue().get(j)), cp);
+                }
+                if (e.getValue().size() - i == 1) row.addView(new View(a), new LinearLayout.LayoutParams(0, -2, 1f));
+                add(list, row, 6);
             }
         }
         if (!any) add(list, detail(a, "مفيش نتائج للبحث."), 10);
+    }
+
+    /** One exam card: name, question count + minutes, and a small status line. */
+    static LinearLayout examCard(MainActivity a, Bank.BankMeta m) {
+        Session s = a.s; Theme t = a.theme;
+        boolean live = s.started && !s.submitted && s.run.equals("all") && m.id.equals(s.bankKey);
+        boolean selected = m.id.equals(s.setupSection);
+        LinearLayout card = new LinearLayout(a);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(Ui.roundStroke(live ? t.primary() : (selected ? t.card55() : t.card()), dp(a, 16), live ? t.primary() : (selected ? t.primary() : t.border()), dp(a, 1.5f)));
+        card.setPadding(dp(a, 14), dp(a, 12), dp(a, 14), dp(a, 12));
+        card.setMinimumHeight(dp(a, 96));
+        TextView name = Ui.tv(a, m.name, 14.5f, t.dispB(), live ? t.onAccent() : t.head());
+        name.setMaxLines(2);
+        card.addView(name);
+        TextView count = Ui.tv(a, Ui.toAr(String.valueOf(m.ids.length)) + " سؤال · " + Ui.toAr(String.valueOf(m.minutes)) + " د", 12, t.body(), live ? t.onAccent() : t.muted());
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.topMargin = dp(a, 4);
+        card.addView(count, cp);
+        int last = lastResult(a, m);
+        TextView st = Ui.tv(a, cardStatus(a, m, last), 12, t.dispB(), live ? t.onAccent() : (last >= 0 ? t.ink() : t.muted()));
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2); sp.topMargin = dp(a, 4);
+        card.addView(st, sp);
+        card.setOnClickListener(v -> a.onExamCard(m));
+        return card;
+    }
+
+    /** Last recorded result for this bank, or -1 when it was never submitted. */
+    static int lastResult(MainActivity a, Bank.BankMeta m) {
+        for (int i = a.s.history.length() - 1; i >= 0; i--) {
+            try {
+                org.json.JSONObject e = a.s.history.getJSONObject(i);
+                if (e.getString("b").equals(m.id)) return e.getInt("n") > 0 ? Math.round(e.getInt("r") * 100f / e.getInt("n")) : 0;
+            } catch (Exception ignore) {}
+        }
+        return -1;
+    }
+
+    static String cardStatus(MainActivity a, Bank.BankMeta m, int last) {
+        Session s = a.s;
+        if (s.started && !s.submitted && s.run.equals("all") && m.id.equals(s.bankKey)) {
+            int answered = s.ids.length - s.blank();
+            return "جارٍ — سؤال " + Ui.toAr(String.valueOf(answered + 1)) + " من " + Ui.toAr(String.valueOf(s.ids.length));
+        }
+        if (last >= 0) return "آخر نتيجة " + Ui.toAr(String.valueOf(last)) + "٪";
+        return "لم يبدأ";
     }
 
     static void modeSeg(MainActivity a, LinearLayout c) {
@@ -591,6 +476,8 @@ final class Screens {
             boolean on0 = ClipPlayer.isPlaying(cf);
             android.widget.ImageView sp = iconChip(a, on0, on0 ? R.drawable.ic_stop : R.drawable.ic_audio, on0 ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
             sp.setOnClickListener(v -> {
+                // Round 4: flip the icon in place — the old code ran renderAll()
+                // twice (once here, once via the toggle callback) on every audio tap.
                 boolean on = ClipPlayer.toggle(a, cf, s.volume, () -> a.renderAll());
                 a.renderAll();
             });

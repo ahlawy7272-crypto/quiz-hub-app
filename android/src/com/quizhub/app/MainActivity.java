@@ -428,6 +428,14 @@ public class MainActivity extends Activity {
         confirmAction = null;
         s.tab = "home"; save(); renderAll();
     }
+    /** Round 4: tapping an exam card starts that exam in the chosen mode — or
+     *  resumes it when it is the live session. A live session for another exam
+     *  asks for confirmation first (confirmBox -> begin()). */
+    void onExamCard(Bank.BankMeta m) {
+        if (s.started && !s.submitted && s.run.equals("all") && m.id.equals(s.bankKey)) { openReview("all"); return; }
+        s.setupSection = m.id; s.minutes = m.minutes; save();
+        if (s.started) { confirmAction = "start"; renderAll(); } else begin();
+    }
     /** Round 4: back to the exam list from a quiz — pauses the exam so the clock
      *  stops (going home used to leave it ticking), and opens the exam list
      *  immediately instead of leaving it collapsed behind "تجربة جديدة". */
