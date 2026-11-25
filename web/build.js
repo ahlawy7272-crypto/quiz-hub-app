@@ -6,6 +6,6 @@ require('esbuild').build({
   entryPoints: ['src/main.tsx'], bundle: true, outfile: 'dist/app.js',
   alias: { '@instinct/files': './src/files-stub.tsx' },
   loader: { '.mp3': 'file', '.png': 'file', '.woff2': 'file', '.ttf': 'file', '.css': 'css' },
-  assetNames: 'a/[name]', define: { 'process.env.NODE_ENV': '"production"' }, jsx: 'automatic', logLevel: 'error'
+  assetNames: 'a/[name]-[hash]', define: { 'process.env.NODE_ENV': '"production"' }, jsx: 'automatic', logLevel: 'error'
 }).then(() => { fs.copyFileSync('index.html', 'dist/index.html'); console.log('built dist/'); })
   .catch(e => { console.error(e.message); process.exit(1); });

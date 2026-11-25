@@ -66,10 +66,11 @@ public final class Bank {
         return n;
     }
 
-    /** Use has() first when the id comes from saved state; this falls back to the first bank. */
+    /** Returns the bank with this id, or null when no bank has it.
+     *  Callers must handle a miss explicitly (message / explicit default) instead of silently switching banks. */
     public BankMeta byId(String id) {
         for (BankMeta m : banks) if (m.id.equals(id)) return m;
-        return banks.get(0);
+        return null;
     }
 
     /** Load (and cache) the full question list of one bank, in session order. */
@@ -77,6 +78,9 @@ public final class Bank {
         if (m.questions != null) return m.questions;
         JSONObject f = new JSONObject(readAsset("bank/bank-" + m.id + ".json"));
         JSONArray arr = f.getJSONArray("questions");
+        if (arr.length() != m.ids.length)
+            throw new Exception("Bank " + m.id + " (" + m.name + "): bank file has " + arr.length()
+                    + " questions but index.json lists " + m.ids.length + " ids");
         List<Question> qs = new ArrayList<>(arr.length());
         for (int i = 0; i < arr.length(); i++) {
             JSONObject j = arr.getJSONObject(i);
@@ -107,7 +111,7 @@ public final class Bank {
         try { for (BankMeta m : banks) for (Question q : questions(m)) map.put(q.gid, q); }
         catch (Exception e) { throw new RuntimeException(e); }
         List<Question> out = new ArrayList<>();
-        for (int g : gids) out.add(map.get(g));
+        for (int g : gids) { Question q = map.get(g); if (q != null) out.add(q); } // a missing gid is skipped, never null
         return out;
     }
 

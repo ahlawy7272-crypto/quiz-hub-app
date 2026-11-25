@@ -74,14 +74,8 @@ body { background: var(--ds-page); }
 .qz-clock-hand { transform-origin: 12px 12px; animation: qz-tick 60s steps(60) infinite; }
 @keyframes qz-tick { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .qz-mode { font-size: 12px; font-weight: 700; color: #2f6a5f; letter-spacing: 0.01em; }
-.qz-demo-chip {
-    font-size: 11px; font-weight:600; color: #e4f5a4;
-    background: #0b4f4a; border: 0;
-    padding: 3px 10px; border-radius: 999px; white-space: nowrap;
-}
 
 .qz-progress-row { margin-top: 10px; }
-.qz-count { display: block; font-size: 12px; font-weight:600; color: #0b3f3b; margin-bottom: 7px; }
 .qz-track { height: 6px; border-radius: 999px; background: rgba(11,79,74,0.15); overflow: hidden; }
 .qz-fill {
     height: 100%; border-radius: 999px;
@@ -89,7 +83,6 @@ body { background: var(--ds-page); }
     transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.qz-steps { display: flex; align-items: center; gap: 0; direction: rtl; }
 .qz-dot {
     font: inherit; flex: none; width: 34px; height: 34px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
@@ -164,31 +157,6 @@ body { background: var(--ds-page); }
 .qz-opt.is-correct, .qz-opt.is-wrong { animation: qz-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes qz-pop { 0% { transform: scale(0.985); } 60% { transform: scale(1.012); } 100% { transform: none; } }
 
-.qz-sheet-backdrop {
-    position: fixed; inset: 0; z-index: 30;
-    background: rgba(11,63,59,0.35);
-    display: flex; align-items: flex-end; justify-content: center;
-    animation: qz-fade 0.2s ease;
-}
-@keyframes qz-fade { from { opacity: 0; } to { opacity: 1; } }
-.qz-sheet {
-    position: relative; width: 100%; max-height: 62%; overflow-y: auto;
-    background: #f4fbd4; border-radius: 20px 20px 0 0;
-    padding: 22px 16px 18px;
-    box-shadow: 0 -14px 40px -18px rgba(11,63,59,0.5);
-    animation: qz-sheet-up 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes qz-sheet-up { from { transform: translateY(28px); opacity: 0.4; } to { transform: none; opacity: 1; } }
-.qz-sheet-handle {
-    position: absolute; top: 8px; inset-inline-start: 50%; transform: translateX(50%);
-    width: 40px; height: 4px; border-radius: 999px; background: rgba(11,79,74,0.3);
-}
-.qz-sheet-close {
-    position: absolute; top: 12px; inset-inline-end: 12px;
-    width: 34px; height: 34px; border-radius: 50%; border: 0; cursor: pointer;
-    font: inherit; font-size: 13px; font-weight:600; color: #0b4f4a;
-    background: rgba(11,79,74,0.1);
-}
 
 .qz-explain {
     margin-top: 12px; border-radius: 18px; padding: 12px 14px 10px;
@@ -356,7 +324,7 @@ body { background: var(--ds-page); }
 .qz-dark { background:#092f2c; color:#e4f5a4; --qz-teal:#cfe98a; }
 .qz-dark .qz-scroll { color:#e4f5a4; }
 .qz-dark .qz-app-head { border-color:#cfe98a33; }
-.qz-dark .qz-q-en, .qz-dark .qz-count, .qz-dark .qz-home-title, .qz-dark .qz-settings-title, .qz-dark .qz-set-label { color:#e4f5a4; }
+.qz-dark .qz-q-en, .qz-dark .qz-home-title, .qz-dark .qz-settings-title, .qz-dark .qz-set-label { color:#e4f5a4; }
 .qz-dark .qz-mode, .qz-dark .qz-home-sub, .qz-dark .qz-set-detail, .qz-dark .qz-home-time { color:#b9d5b4; }
 .qz-dark .qz-set-group { background:#ffffff08; border-color:#b8db9a33; }
 .qz-dark .qz-set-group .qz-set-row { border-color:#cfe98a22; }
@@ -393,7 +361,6 @@ body { background: var(--ds-page); }
 .qz-dark .qz-save-status { color:#b9d5b4; }
 .qz-dark .qz-link-track { background:#cfe98a2e; }
 .qz-dark .qz-link-fill { background:#cfe98a; }
-.qz-storage { font-size:11px; line-height:1.8; padding:10px 12px; border:1px solid #0b4f4a33; border-radius:12px; text-align:start; }
 .qz-setup { padding:0 14px 18px; display:flex; flex-direction:column; gap:12px; }
 .qz-choice-stack,.qz-action-stack { display:flex; flex-direction:column; gap:10px; }
 .qz-choice-stack .qz-tool-btn { text-align:start; min-height:44px; white-space:normal; }
@@ -407,7 +374,6 @@ body { background: var(--ds-page); }
 .qz-result-grid span { font-size:12px; }
 .qz-review-banner { font-size:12px; line-height:1.8; }
 .qz-confirm-box { position:relative; z-index:2; }
-.qz-dark .qz-storage { border-color:#cfe98a44; }
 .qz-dark .qz-result-grid>div { background:#17483e; }
 .qz-dark .qz-opt.is-pending:not(.is-correct):not(.is-wrong) { background:#315c40; border-color:#e4f5a4; box-shadow:0 0 0 2px #cfe98a44; }
 .qz-launch[hidden] { display:none; }
@@ -421,10 +387,6 @@ body { background: var(--ds-page); }
 .qz-session-map summary {cursor:pointer;min-height:44px;font-size:13px;font-weight:600;}
 .qz-home-cards {display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;}
 .qz-home-card {min-width:0;}
-.qz-missing-image {margin:10px 0 0;}
-
-.qz-steps .qz-dot {flex:0 0 44px;width:44px;min-width:44px;font-size:12px;}
-.qz-steps .qz-link-track {min-width:3px;margin:0 3px;}
 
 /* Compact question workspace; progress and question navigation follow English LTR. */
 .qz-is-solving .qz-app-head {min-height:48px;padding:0 16px;gap:8px;}
@@ -449,6 +411,11 @@ body { background: var(--ds-page); }
 .qz-dark .qz-icon-chip {background:#17483e;color:#e4f5a4;border-color:#cfe98a44;}
 .qz-dark .qz-tools .qz-icon-btn.is-open {color:#e4f5a4;}
 .qz-dark .qz-tools .qz-icon-btn.is-open .qz-icon-chip {background:#e4f5a4;color:#0b4f4a;border-color:#e4f5a4;}
+/* Flag button: gold when a question is flagged, so it reads differently from the other tool buttons (which turn teal when open). */
+.qz-flag-btn .qz-icon-chip { border-color: #b98a2f; }
+.qz-flag-btn.is-open .qz-icon-chip { background: #b98a2f; border-color: #b98a2f; color: #fff; }
+.qz-dark .qz-flag-btn .qz-icon-chip { border-color: #cfe98a; }
+.qz-dark .qz-flag-btn.is-open .qz-icon-chip { background: #cfe98a; border-color: #cfe98a; color: #092f2c; }
 .qz-progress-row .qz-map-trigger {margin:0;background:transparent;border-color:transparent;}
 .qz-is-solving .qz-question {margin-top:6px;}
 .qz-is-solving .qz-tools {margin-top:8px;gap:6px;}

@@ -8,7 +8,7 @@ Signed APKs are on the Releases page of this repo. Run the commands below from t
 - `src/`, `res/`, `AndroidManifest.xml`: app code and resources.
 - `assets/bank/`: question banks (bank-0..9.json, index.json). `assets/audio/`: clips (g* generated, r* lecturer; `clip_map.json` maps duplicate names to one stored file). `assets/fonts`, `assets/branding`, `assets/sfx`.
 - `tools/build.sh`: builds an unsigned, aligned APK.
-- `tests/`: Robolectric UI harness sources used for screenshots and state checks (a harness, not a device test).
+- `tests/`: Robolectric harness sources — `Verify1.java` has real asserting tests (run with `tests/run_verify.sh`); the `Shot*`/`Audit*` sources are screenshot/state inspection only (a harness, not a device test).
 - `signing/quizhub-release-cert.pem`: PUBLIC certificate only. SHA-256 of the release signer: 19feecae1df35141ba896216bc7837080bfd78bc6e645b3929243058787ce203. The private key is not in this repo.
 
 ## Build
@@ -21,7 +21,7 @@ An APK signed with another key cannot update over the release APK (uninstall fir
 
 ## Notes
 - Audio files must stay stored (uncompressed) in the APK. `tools/build.sh` does this.
-- Progress backup format is the web-compatible `QH2` code (Settings).
+- Progress backup is a `QH2` code (Settings) that transfers between the current web build and the current Android build (1,186 questions only). A code from the older 3,122-question build is refused and the current progress is left unchanged.
 - Tested in a Robolectric harness and with apksigner/zipalign. Real-phone playback was not confirmed at the time of this commit.
 
 ## Backup and old progress compatibility

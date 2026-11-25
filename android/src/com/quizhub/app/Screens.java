@@ -282,7 +282,7 @@ final class Screens {
     static int[] wrongIds(MainActivity a, String scope) {
         java.util.ArrayList<Integer> out = new java.util.ArrayList<>();
         if (scope.equals("all")) out.addAll(a.s.wrong);
-        else for (int g : a.bank.byId(scope).ids) if (a.s.wrong.contains(g)) out.add(g);
+        else { Bank.BankMeta m = a.bank.byId(scope); if (m == null) out.addAll(a.s.wrong); else for (int g : m.ids) if (a.s.wrong.contains(g)) out.add(g); }
         java.util.Collections.sort(out);
         int[] r = new int[out.size()]; for (int i = 0; i < r.length; i++) r[i] = out.get(i); return r;
     }

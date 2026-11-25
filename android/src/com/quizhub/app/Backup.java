@@ -43,6 +43,7 @@ public final class Backup {
         for (int g : s.favorites) if (g >= 0 && g < N) fav[g] = '1';
         JSONObject setup = new JSONObject();
         Bank.BankMeta sb = a.bank.byId(s.setupSection);
+        if (sb == null) { sb = a.bank.banks.get(0); s.setupSection = sb.id; } // explicit default; the code stays self-consistent
         setup.put("section", sb.id); setup.put("count", sb.ids.length); setup.put("mode", s.setupMode);
         JSONObject o = new JSONObject();
         o.put("run", s.run); o.put("bank", s.run.equals("all") ? s.bankKey : s.run);
@@ -85,6 +86,10 @@ public final class Backup {
             if (pk.length() == 3122 || fv.length() == 3122) return "الكود ده من نسخة قديمة (٣١٢٢ سؤال) ومش مدعوم هنا. تقدمك الحالي ما اتغيّرش.";
             if (pk.length() != N || fv.length() != N || idsA == null || se == null || ex.optJSONArray("h") == null || !ex.has("w"))
                 return "الكود مش صحيح.";
+            // The bank named by the code must exist in this build; refuse before touching the current state.
+            JSONObject su0 = st.optJSONObject("setup");
+            if (su0 != null && !a.bank.has(su0.optString("section", "6")))
+                return "البنك اللي في الكود مش موجود في النسخة دي. تقدمك الحالي ما اتغيّرش.";
             int[] ids = new int[idsA.length()];
             for (int i = 0; i < ids.length; i++) { ids[i] = idsA.getInt(i); if (ids[i] < 0 || ids[i] >= N) return "الكود مش من نفس النسخة."; }
             Session.keepBeforeRestore(a);

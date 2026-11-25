@@ -39,6 +39,17 @@ public class MainActivity extends Activity {
     Handler handler = new Handler();
     Runnable ticker;
     Runnable autoNextRun;
+    boolean tickerScheduled = false;
+    boolean bankLoadFailed = false;
+
+    /** Clear Arabic error view for unreadable question files; marks the failure so no quiz is rendered over it. */
+    void showBankError(Exception e) {
+        bankLoadFailed = true;
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText("ملفات الأسئلة جوه التطبيق مش سليمة، فمقدرش أفتحها. نزّل نسخة التطبيق تاني وثبّتها فوق الموجودة. تقدمك محفوظ.\n\n" + e);
+        tv.setPadding(48, 96, 48, 48); tv.setTextSize(16); tv.setTextDirection(View.TEXT_DIRECTION_RTL);
+        setContentView(tv);
+    }
 
     String review = "all";        // all | wrong
     String confirmAction = null;  // finish | start | null
@@ -58,10 +69,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         theme.loadFonts(this);
         try { bank = new Bank(this); } catch (Exception e) {
-            android.widget.TextView tv = new android.widget.TextView(this);
-            tv.setText("ملفات الأسئلة جوه التطبيق مش سليمة، فمقدرش أفتحها. نزّل نسخة التطبيق تاني وثبّتها فوق الموجودة. تقدمك محفوظ.\n\n" + e);
-            tv.setPadding(48, 96, 48, 48); tv.setTextSize(16); tv.setTextDirection(View.TEXT_DIRECTION_RTL);
-            setContentView(tv);
+            showBankError(e);
             return;
         }
         s = Session.load(this, bank);
@@ -241,21 +249,25 @@ public class MainActivity extends Activity {
     }
 
     // ---------------- timer ----------------
+    // The ticker only runs while a quiz is being solved. When it is not running
+    // it stops re-posting (no idle ticking); startTicker() restarts it on resume/begin.
     void startTicker() {
+        if (tickerScheduled || s == null) return;
+        tickerScheduled = true;
         ticker = new Runnable() {
             @Override public void run() {
+                if (bankLoadFailed) { tickerScheduled = false; return; }
                 boolean running = s.started && !s.submitted && !(s.allAnswered() && s.mode.equals("study"))
                         && !s.paused && !s.expired() && !(s.quizOnly && !s.tab.equals("quiz"));
-                if (running) {
-                    s.elapsed++;
-                    if (s.elapsed % 10 == 0) save(); // onPause saves too; was every second
-                    if (timerChip != null && s.timer) {
-                        int val = s.countdown ? s.remaining() : s.elapsed;
-                        timerChipLabel.setText(s.countdown?"باقي":"الوقت");
-                        timerChipTime.setText(Ui.lre(Ui.formatTime(val)));
-                    }
-                    if (s.expired()) renderAll(); // lock answers the moment it hits zero
+                if (!running) { tickerScheduled = false; return; }
+                s.elapsed++;
+                if (s.elapsed % 10 == 0) save(); // onPause saves too; was every second
+                if (timerChip != null && s.timer) {
+                    int val = s.countdown ? s.remaining() : s.elapsed;
+                    timerChipLabel.setText(s.countdown?"باقي":"الوقت");
+                    timerChipTime.setText(Ui.lre(Ui.formatTime(val)));
                 }
+                if (s.expired()) renderAll(); // lock answers the moment it hits zero
                 handler.postDelayed(ticker, 1000);
             }
         };
@@ -266,7 +278,7 @@ public class MainActivity extends Activity {
     boolean celebrate = false;
     String pendingRunKind = null; int[] pendingRunIds = null;
     void ensureQs() {
-        if (qs != null) return;
+        if (qs != null || bankLoadFailed) return;
         if (!s.run.equals("all")) qs = bank.forIds(s.ids); else loadBank(sessionBank());
     }
     void startRun(String kind, int[] ids) {
@@ -277,7 +289,8 @@ public class MainActivity extends Activity {
     String runLabel(String key) {
         if (key.equals("notebook")) return "دفتر الغلطات";
         if (key.equals("flagged")) return "الأسئلة المعلّمة";
-        return bank.byId(key).name;
+        Bank.BankMeta b = bank.byId(key);
+        return b != null ? b.name : "بنك غير معروف (" + key + ")";
     }
     void recordSubmit() {
         int right = 0; java.util.ArrayList<Integer> wr = new java.util.ArrayList<>(), ok = new java.util.ArrayList<>();
@@ -299,6 +312,11 @@ public class MainActivity extends Activity {
     }
     void begin() {
         Bank.BankMeta b = bank.byId(s.setupSection);
+        if (b == null) {
+            android.widget.Toast.makeText(this, "البنك المحفوظ مش موجود في النسخة دي، فبدأنا من أول بنك.", android.widget.Toast.LENGTH_LONG).show();
+            b = bank.banks.get(0);
+            s.setupSection = b.id;
+        }
         if (pendingRunKind != null) {
             s.run = pendingRunKind; s.bankKey = pendingRunKind; s.ids = pendingRunIds.clone();
             pendingRunKind = null; pendingRunIds = null;
@@ -310,7 +328,7 @@ public class MainActivity extends Activity {
         s.resultElapsed = -1; s.mode = s.setupMode; s.tab = "quiz";
         review = "all"; celebrate = false; confirmAction = null; resultSeen = false; setupOpen = null;
         if (qs == null) loadBank(b);
-        save(); renderAll();
+        save(); renderAll(); startTicker();
     }
     void finishQuiz() {
         if (s.blank() > 0) { confirmAction = "finish"; renderAll(); }
@@ -380,7 +398,7 @@ public class MainActivity extends Activity {
 
     void loadBank(Bank.BankMeta b) {
         currentBank = b;
-        try { qs = bank.questions(b); } catch (Exception e) { throw new RuntimeException(e); }
+        try { qs = bank.questions(b); } catch (Exception e) { showBankError(e); }
     }
     Bank.BankMeta sessionBank() {
         // find the bank whose ids match the session's first id
@@ -388,12 +406,14 @@ public class MainActivity extends Activity {
             for (Bank.BankMeta m : bank.banks)
                 if (m.ids.length == s.ids.length && m.ids[0] == s.ids[0]) return m;
         }
-        return bank.byId(s.setupSection);
+        Bank.BankMeta b = bank.byId(s.setupSection);
+        return b != null ? b : bank.banks.get(0); // explicit default: first bank in index order
     }
 
     void save() { s.save(this); }
 
     void renderAll() {
+        if (bankLoadFailed) return;
         theme.dark = s.dark; theme.scale = s.fontPercent / 100f;
         root.setBackgroundColor(0xffffffff);
         screen.setBackground(Ui.round(theme.bg(), Ui.dp(this, 28)));
@@ -419,7 +439,9 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
-    @Override protected void onDestroy() { super.onDestroy(); if (handler != null) { if (ticker != null) handler.removeCallbacks(ticker); if (autoNextRun != null) handler.removeCallbacks(autoNextRun); } }
+    @Override protected void onDestroy() { super.onDestroy(); tickerScheduled = false; if (handler != null) { if (ticker != null) handler.removeCallbacks(ticker); if (autoNextRun != null) handler.removeCallbacks(autoNextRun); } }
 
-    @Override protected void onPause() { super.onPause(); ClipPlayer.stop(); if (s != null) save(); }
+    @Override protected void onPause() { super.onPause(); ClipPlayer.stop(); tickerScheduled = false; if (handler != null && ticker != null) handler.removeCallbacks(ticker); if (s != null) save(); }
+
+    @Override protected void onResume() { super.onResume(); startTicker(); }
 }

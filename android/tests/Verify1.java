@@ -121,6 +121,66 @@ public class Verify1 {
         } finally { Bank.assetDirOverride = null; }
     }
 
+    /** byId() must return null for an unknown bank instead of silently switching banks. */
+    @Test public void unknownBankIdReturnsNull() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        assertNull(a.bank.byId("42"));
+        assertNull(a.bank.byId(""));
+        assertNotNull(a.bank.byId("6"));
+        assertEquals("6", a.bank.byId("6").id);
+    }
+
+    /** forIds() must skip unknown gids instead of adding nulls. */
+    @Test public void forIdsFiltersUnknownIds() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        java.util.List<Bank.Question> qs = a.bank.forIds(new int[]{598, 9999, 599, -1});
+        assertEquals(2, qs.size());
+        for (Bank.Question q : qs) assertNotNull(q);
+        assertEquals(598, qs.get(0).gid);
+        assertEquals(599, qs.get(1).gid);
+    }
+
+    /** Picked values outside '.' / '0'..'4' must be reset to unanswered, not kept as odd values. */
+    @Test public void invalidPickedValuesAreReset() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.s.setupSection = "6"; a.begin(); a.save();
+        android.content.SharedPreferences p = a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE);
+        JSONObject j = new JSONObject(p.getString("state", null));
+        int n = a.s.ids.length;
+        StringBuilder pk = new StringBuilder();
+        for (int i = 0; i < n; i++) pk.append(i == 0 ? '9' : i == 1 ? 'x' : i == 2 ? '2' : '.');
+        j.put("picked", pk.toString());
+        p.edit().putString("state", j.toString()).commit();
+        Session s = Session.load(a, a.bank);
+        assertEquals(-1, s.picked[0]);
+        assertEquals(-1, s.picked[1]);
+        assertEquals(2, s.picked[2]);
+        assertNull("a single bad answer must not trigger a whole-session reset", s.notice);
+    }
+
+    /** A backup code naming a bank that does not exist in this build is refused, state untouched. */
+    @Test public void backupRestoreWithUnknownSectionIsRefused() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        String code = fixture();
+        byte[] z = android.util.Base64.decode(code.substring(4), android.util.Base64.DEFAULT);
+        java.util.zip.Inflater inf = new java.util.zip.Inflater(true); inf.setInput(z);
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] buf = new byte[8192];
+        while (!inf.finished()) { int n = inf.inflate(buf); if (n == 0) break; bo.write(buf, 0, n); }
+        JSONObject o = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
+        o.getJSONObject("s").getJSONObject("setup").put("section", "42");
+        java.util.zip.Deflater df = new java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true);
+        byte[] in = o.toString().getBytes("UTF-8"); df.setInput(in); df.finish();
+        java.io.ByteArrayOutputStream bo2 = new java.io.ByteArrayOutputStream(); byte[] buf2 = new byte[8192];
+        while (!df.finished()) { int n = df.deflate(buf2); bo2.write(buf2, 0, n); }
+        df.end();
+        String bad = "QH2." + android.util.Base64.encodeToString(bo2.toByteArray(), android.util.Base64.NO_WRAP);
+        a.save();
+        String before = a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE).getString("state", null);
+        String msg = Backup.restore(a, bad);
+        assertTrue(msg.contains("مش موجود"));
+        assertEquals(before, a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE).getString("state", null));
+    }
+
     /** Every question has a clip (lecturer r or generated g, after clip_map), none empty. */
     @Test public void everyQuestionHasPlayableAsset() throws Exception {
         MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();

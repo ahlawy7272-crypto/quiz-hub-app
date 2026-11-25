@@ -84,6 +84,9 @@ public final class Session {
      *  The untouched old state is kept (state_legacy_backup, exportable from Settings), this build starts fresh with the readable settings, and a notice says so. */
     void sanitize(Bank bank) {
         int total = bank.total();
+        // Picked values are only '.' (stored as -1) or '0'..'4'; anything else is
+        // corrupt data from another build, so reset just those answers to unanswered.
+        for (int i = 0; i < picked.length; i++) if (picked[i] < -1 || picked[i] > 4) picked[i] = -1;
         boolean bad = !bank.has(bankKey) || !bank.has(setupSection);
         for (int id : ids) if (id < 0 || id >= total) bad = true;
         for (int g : favorites) if (g < 0 || g >= total) bad = true;
