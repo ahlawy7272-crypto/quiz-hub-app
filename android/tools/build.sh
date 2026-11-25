@@ -15,8 +15,10 @@ find "$O/classes" -name '*.class' > "$O/c.txt"
 "$BT/d8" --min-api 24 --output "$O/dex" @"$O/c.txt"
 cp "$O/unsigned.apk" "$O/al.apk"
 (cd "$O" && zip -q -0 al.apk -j dex/classes.dex)
-# non-audio assets compressed, audio STORED (required so MediaPlayer can open clips straight from the APK; the loop handles spaces in filenames)
-(cd "$P" && for d in assets/*; do [ "$d" = "assets/audio" ] && continue; zip -q -r -9 "$O/al.apk" "$d"; done)
-(cd "$P" && zip -q -r -0 "$O/al.apk" assets/audio)
+# non-audio assets compressed; audio AND sfx STORED (MediaPlayer can only open a clip
+# straight from the APK when it is uncompressed — the sfx files used to be compressed
+# here, so openFd() threw and the correct/wrong sounds silently never played)
+(cd "$P" && for d in assets/*; do [ "$d" = "assets/audio" ] && continue; [ "$d" = "assets/sfx" ] && continue; zip -q -r -9 "$O/al.apk" "$d"; done)
+(cd "$P" && zip -q -r -0 "$O/al.apk" assets/audio assets/sfx)
 "$BT/zipalign" -f 4 "$O/al.apk" "$O/QuizHub-unsigned.apk"
 echo "Built $O/QuizHub-unsigned.apk. Sign it with your own key: apksigner sign --ks YOUR.p12 --out QuizHub.apk $O/QuizHub-unsigned.apk"

@@ -145,10 +145,36 @@ public final class ClipPlayer {
     public static void sfx(Context c, boolean correct, int volume) {
         if (volume <= 0) return;
         try {
-            AssetFileDescriptor f = c.getAssets().openFd("sfx/" + (correct ? "correct" : "wrong") + ".mp3");
+            String name = (correct ? "correct" : "wrong") + ".mp3";
+            AssetFileDescriptor fd = null;
+            String path = null;
+            try {
+                fd = c.getAssets().openFd("sfx/" + name);
+            } catch (Exception first) {
+                // The sfx files used to be packaged DEFLATED (build.sh compressed
+                // everything except assets/audio), and openFd() throws for a
+                // compressed asset — so the sound silently never played. Fall back
+                // to a cached copy, like load() does for the explanation clips.
+                java.io.File out = new java.io.File(c.getCacheDir(), name);
+                if (!out.exists() || out.length() == 0) {
+                    java.io.InputStream in = c.getAssets().open("sfx/" + name);
+                    java.io.FileOutputStream fo = new java.io.FileOutputStream(out);
+                    byte[] buf = new byte[16384]; int n;
+                    while ((n = in.read(buf)) > 0) fo.write(buf, 0, n);
+                    fo.close(); in.close();
+                }
+                path = out.getAbsolutePath();
+            }
             final MediaPlayer m = new MediaPlayer();
-            m.setDataSource(f.getFileDescriptor(), f.getStartOffset(), f.getLength());
-            f.close();
+            m.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA).build());
+            if (fd != null) {
+                m.setDataSource(fd.getFileDescriptor(), fd.getStartOffset(), fd.getLength());
+                fd.close();
+            } else {
+                m.setDataSource(path);
+            }
             float v = Math.max(0f, Math.min(1f, volume / 100f));
             m.setVolume(v, v);
             m.setOnCompletionListener(x -> x.release());
