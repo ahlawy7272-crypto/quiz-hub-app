@@ -493,6 +493,10 @@ final class Screens {
         wr.setAlpha(wrong > 0 ? 1f : .35f);
         wr.setOnClickListener(v -> a.openReview("wrong"));
         add(c, wr, 8);
+        // Round 4: a clear way back to the exam cards from the result screen.
+        Button list = btn(a, "القائمة", false);
+        list.setOnClickListener(v -> a.goToList());
+        add(c, list, 8);
     }
 
     static void quizEmpty(MainActivity a, LinearLayout c) {

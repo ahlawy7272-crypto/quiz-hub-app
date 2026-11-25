@@ -134,8 +134,6 @@ public class MainActivity extends Activity {
         pendingRunIds = b.getIntArray("pendingRunIds");
         bankQuery = b.getString("bankQuery", "");
     }
-
-    /** S4-8: dark system bars in dark mode instead of a white frame around a dark app. */
     void applyFrame() {
         if (theme.dark) {
             getWindow().setStatusBarColor(0xff092f2c);
@@ -220,7 +218,7 @@ public class MainActivity extends Activity {
 
     void onTab(int i) {
         confirmAction = null;
-        if (i == 0) { goHome(); }
+        if (i == 0) { goToList(); }
         else if (i == 1) { openReview("all"); }
         else { s.tab = "settings"; save(); renderAll(); }
     }
@@ -248,6 +246,25 @@ public class MainActivity extends Activity {
     void refreshHeader() {
         header.removeAllViews();
         boolean solving = s.tab.equals("quiz") && s.started;
+        // Round 4: an explicit "‹ القائمة" back control on the quiz screen — the
+        // only way back used to be the small bottom tab or the system Back key.
+        if (solving) {
+            android.widget.Button back = new android.widget.Button(this);
+            back.setText("‹ القائمة");
+            back.setAllCaps(false);
+            back.setTextSize(13);
+            back.setTypeface(theme.disp());
+            back.setMinHeight(0); back.setMinimumHeight(0);
+            back.setPadding(Ui.dp(this, 12), Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
+            back.setStateListAnimator(null);
+            back.setBackground(Ui.roundStroke(Color.TRANSPARENT, Ui.dp(this, 999), theme.border3(), Ui.dp(this, 1.5f)));
+            back.setTextColor(theme.ink());
+            back.setContentDescription("رجوع لقائمة الامتحانات");
+            back.setOnClickListener(v -> goToList());
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-2, -2);
+            bp.setMarginEnd(Ui.dp(this, 8));
+            header.addView(back, bp);
+        }
         // brand: mark + name (+ purpose when not compact), LTR
         LinearLayout brand = new LinearLayout(this);
         brand.setOrientation(LinearLayout.HORIZONTAL);
@@ -411,7 +428,14 @@ public class MainActivity extends Activity {
         confirmAction = null;
         s.tab = "home"; save(); renderAll();
     }
-    /** S3-6: restore the progress that was live before the last backup restore. */
+    /** Round 4: back to the exam list from a quiz — pauses the exam so the clock
+     *  stops (going home used to leave it ticking), and opens the exam list
+     *  immediately instead of leaving it collapsed behind "تجربة جديدة". */
+    void goToList() {
+        if (s.started && !s.submitted) s.paused = true;
+        setupOpen = true;
+        goHome();
+    }    /** S3-6: restore the progress that was live before the last backup restore. */
     void undoLastRestore() {
         if (!Session.undoRestore(this)) { android.widget.Toast.makeText(this, "مفيش استرجاع سابق للتراجع عنه.", android.widget.Toast.LENGTH_SHORT).show(); return; }
         s = Session.load(this, bank);
@@ -422,6 +446,9 @@ public class MainActivity extends Activity {
     }
     void openReview(String filter) {
         review = filter;
+        // Round 4: "كمّل الحل" means resume — unpause a live session, or the quiz
+        // would reopen with a stopped clock and no visible way to restart it.
+        if (s.started && !s.submitted) s.paused = false;
         if (filter.equals("wrong")) {
             // ensure index points at a wrong answer
             if (!(s.picked[s.index] >= 0 && s.picked[s.index] != qs.get(s.index).c)) {
@@ -509,7 +536,8 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        if (!s.tab.equals("home")) { goHome(); }
+        // Round 4: system Back from a quiz also pauses the exam (same as "‹ القائمة").
+        if (!s.tab.equals("home")) { goToList(); }
         else super.onBackPressed();
     }
 
