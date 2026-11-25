@@ -6,7 +6,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.View;
 
-/** One thin rail + fill + one small numbered marker moving left to right (gen18 .qz-progress-row). */
+/** One thin rail + fill + one small numbered marker moving right to left (RTL, gen18 .qz-progress-row). */
 public final class ProgressView extends View {
     private final Paint rail = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -47,8 +47,8 @@ public final class ProgressView extends View {
         float inset = Ui.dp(getContext(), 15); // rail padded 0 15px
         float x0 = inset, x1 = w - inset;
         c.drawRoundRect(new RectF(x0, cy - railH/2, x1, cy + railH/2), railH/2, railH/2, rail);
-        float mx = x0 + (x1 - x0) * progress;
-        c.drawRoundRect(new RectF(x0, cy - railH/2, Math.max(mx, x0 + railH), cy + railH/2), railH/2, railH/2, fill);
+        float mx = x1 - (x1 - x0) * progress; // RTL: progress advances from the right
+        c.drawRoundRect(new RectF(Math.min(mx, x1 - railH), cy - railH/2, x1, cy + railH/2), railH/2, railH/2, fill);
         c.drawCircle(mx, cy, mR + Ui.dp(getContext(), 3), markerRing);
         c.drawCircle(mx, cy, mR, marker);
         Paint.FontMetrics fm = text.getFontMetrics();

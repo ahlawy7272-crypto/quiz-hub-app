@@ -134,7 +134,7 @@ final class Screens {
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(0,-2,1f);
         row.addView(ok, new LinearLayout.LayoutParams(0,-2,1f));
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(0,-2,1f);
-        bp.setMargins(dp(a,10),0,0,0);
+        bp.setMarginStart(dp(a,10));
         row.addView(back, bp);
         LinearLayout.LayoutParams rp2 = new LinearLayout.LayoutParams(-1,-2);
         rp2.topMargin = dp(a,10);
@@ -153,7 +153,7 @@ final class Screens {
         // compact notebook / flagged actions — the only way to start those runs
         if (!s.wrong.isEmpty() || !s.favorites.isEmpty()) {
             LinearLayout row = new LinearLayout(a);
-            row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            // RTL row: notebook first (right/start), flagged second (left/end).
             if (!s.wrong.isEmpty()) {
                 Button nb = btn(a, "دفتر الغلطات (" + Ui.toAr(String.valueOf(s.wrong.size())) + ")", true);
                 nb.setOnClickListener(v -> a.startRun("notebook", wrongIds(a, "all")));
@@ -163,7 +163,7 @@ final class Screens {
                 Button fb = btn(a, "راجعني (" + Ui.toAr(String.valueOf(s.favorites.size())) + ")", true);
                 fb.setOnClickListener(v -> { int[] ids = new int[s.favorites.size()]; int i = 0; for (int g : s.favorites) ids[i++] = g; a.startRun("flagged", ids); });
                 LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(0, -2, 1f);
-                if (!s.wrong.isEmpty()) fp.setMargins(dp(a, 10), 0, 0, 0);
+                if (!s.wrong.isEmpty()) fp.setMarginStart(dp(a, 10));
                 row.addView(fb, fp);
             }
             add(c, row, 14);
@@ -207,10 +207,10 @@ final class Screens {
             for (int i = 0; i < e.getValue().size(); i += 2) {
                 any = true;
                 LinearLayout row = new LinearLayout(a);
-                row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+                // RTL row: first card right (start), second card left (end).
                 for (int j = i; j < Math.min(i + 2, e.getValue().size()); j++) {
                     LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
-                    if (j > i) cp.setMargins(dp(a, 10), 0, 0, 0);
+                    if (j > i) cp.setMarginStart(dp(a, 10));
                     row.addView(examCard(a, e.getValue().get(j)), cp);
                 }
                 if (e.getValue().size() - i == 1) row.addView(new View(a), new LinearLayout.LayoutParams(0, -2, 1f));
@@ -295,12 +295,12 @@ final class Screens {
         if (s.timer) {
             LinearLayout tr = new LinearLayout(a);
             tr.setOrientation(LinearLayout.HORIZONTAL);
-            tr.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+            tr.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             android.widget.ImageView ic = new android.widget.ImageView(a);
             ic.setImageResource(R.drawable.ic_clock);
             ic.setColorFilter(t.ink());
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(a,16), dp(a,16));
-            ip.setMargins(dp(a, 4), 0, 0, 0); // gap on the side facing the time view
+            ip.setMarginEnd(dp(a, 4)); // gap on the side facing the time view
             tr.addView(ic, ip); // RTL row: first child sits rightmost
             tr.addView(Ui.timeView(a, s.elapsed, 13, t.disp(), t.ink()));
             add(c, tr, 10);
@@ -345,7 +345,7 @@ final class Screens {
             TextView l = Ui.tv(a, names[i], 12, t.disp(), t.muted());
             cell.addView(n); cell.addView(l);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0,-2,1f);
-            if (i > 0) cp.setMargins(dp(a,8),0,0,0);
+            if (i > 0) cp.setMarginStart(dp(a,8));
             grid.addView(cell, cp);
         }
         LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(-1,-2);
@@ -354,16 +354,16 @@ final class Screens {
         {
             LinearLayout tr = new LinearLayout(a);
             tr.setOrientation(LinearLayout.HORIZONTAL);
-            tr.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+            tr.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             android.widget.ImageView ic = new android.widget.ImageView(a);
             ic.setImageResource(R.drawable.ic_clock);
             ic.setColorFilter(t.ink());
             LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(a,16), dp(a,16));
-            ip.setMargins(dp(a, 4), 0, 0, 0);
+            ip.setMarginEnd(dp(a, 4));
             tr.addView(ic, ip);
             TextView lb = Ui.tv(a, "وقت الحل:", 13, t.disp(), t.ink());
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.setMargins(dp(a, 4), 0, 0, 0);
+            lp.setMarginEnd(dp(a, 4));
             tr.addView(lb, lp);
             tr.addView(Ui.timeView(a, s.resultElapsed >= 0 ? s.resultElapsed : s.elapsed, 13, t.disp(), t.ink()));
             add(c, tr, 12);
@@ -429,15 +429,15 @@ final class Screens {
             c.addView(banner);
         }
 
-        // progress row (LTR)
+        // progress row (RTL: the bar fills right to left, like the web version)
         if (s.steps) {
             LinearLayout row = new LinearLayout(a);
-            row.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             row.setGravity(Gravity.CENTER_VERTICAL);
             ProgressView pv = new ProgressView(a, t);
             pv.set(fpos, view.size(), t);
             row.addView(pv, new LinearLayout.LayoutParams(0, dp(a,28), 1f));
-            TextView total = Ui.tv(a, "/ " + view.size(), 11, t.dispB(), t.muted());
+            TextView total = Ui.tv(a, Ui.lre("/ " + view.size()), 11, t.dispB(), t.muted());
+            total.setTextDirection(View.TEXT_DIRECTION_LTR); // "/ 147" must keep LTR order inside the RTL row
             total.setPadding(dp(a,8),0,dp(a,8),0);
             row.addView(total);
             android.widget.ImageView map = iconChip(a, false, R.drawable.ic_map, "خريطة الأسئلة");
@@ -466,7 +466,7 @@ final class Screens {
             android.widget.ImageView fl = iconChip(a, s.favorites.contains(q.gid), R.drawable.ic_flag, "راجعني");
             fl.setOnClickListener(v -> { if (!s.favorites.remove(q.gid)) s.favorites.add(q.gid); a.save(); a.renderAll(); });
             LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
-            fp.setMargins(dp(a,6),0,0,0);
+            fp.setMarginStart(dp(a,6));
             tools.addView(fl, fp);
         }
         String clipFile = ClipPlayer.exists(a, "r" + q.gid + ".mp3") ? "r" + q.gid + ".mp3"
@@ -483,7 +483,7 @@ final class Screens {
                 sp.setContentDescription(on ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
             });
             LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
-            spp.setMargins(dp(a,6),0,0,0);
+            spp.setMarginStart(dp(a,6));
             tools.addView(sp, spp);
         }
         // Round 4: stop the clip of another question only when one is actually
@@ -493,7 +493,7 @@ final class Screens {
             Button ex = toolBtn(a, "الشرح");
             ex.setTextSize(11f); ex.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6)); // user: smaller, like the chips next to it
             LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-2, dp(a,44));
-            ep.setMargins(dp(a,6),0,0,0);
+            ep.setMarginStart(dp(a,6));
             ex.setOnClickListener(v -> showExplain(a));
             tools.addView(ex, ep);
         }
@@ -501,7 +501,7 @@ final class Screens {
             android.widget.ImageView hint = iconChip(a, a.hintOpen, R.drawable.ic_bulb, "التلميح");
             hint.setOnClickListener(v -> { a.hintOpen = !a.hintOpen; a.renderAll(); });
             LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
-            hp.setMargins(dp(a,6),0,0,0);
+            hp.setMarginStart(dp(a,6));
             tools.addView(hint, hp);
         }
         add(c, tools, 8);
@@ -578,9 +578,8 @@ final class Screens {
             add(c, cb, 12);
         }
 
-        // nav: Previous LEFT, Next RIGHT (LTR row, Arabic labels)
+        // nav: RTL row — Previous on the right (start), Next on the left (end), matching reading direction.
         LinearLayout nav = new LinearLayout(a);
-        nav.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         Button prev = btn(a, "السابق", false);
         prev.setEnabled(fpos > 0); prev.setAlpha(fpos > 0 ? 1f : .35f);
         prev.setOnClickListener(v -> { s.index = view.get(fpos - 1); a.trReset(); a.save(); a.renderAll(); });
@@ -590,7 +589,7 @@ final class Screens {
         next.setOnClickListener(v -> { s.index = view.get(fpos + 1); a.trReset(); a.save(); a.renderAll(); });
         nav.addView(prev, new LinearLayout.LayoutParams(0,-2,1f));
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0,-2,1f);
-        np.setMargins(dp(a,10),0,0,0);
+        np.setMarginStart(dp(a,10));
         nav.addView(next, np);
         add(c, nav, 12);
 
@@ -806,7 +805,7 @@ final class Screens {
         zero.setOnClickListener(v -> { s.elapsed = 0; a.save(); a.renderAll(); });
         clockRow.addView(pause, new LinearLayout.LayoutParams(0,-2,1f));
         LinearLayout.LayoutParams zp = new LinearLayout.LayoutParams(0,-2,1f);
-        zp.setMargins(dp(a,10),0,0,0);
+        zp.setMarginStart(dp(a,10));
         clockRow.addView(zero, zp);
         add(c, clockRow, 10);
 
@@ -973,12 +972,12 @@ final class Screens {
         skp.topMargin = dp(a,8);
         box.addView(seek, skp);
         LinearLayout labels = new LinearLayout(a);
-        labels.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        // RTL row: small (right/start), big (left/end) — matches the mirrored SeekBar.
         TextView big = Ui.tv(a, "كبير", 11, t.body(), t.muted());
         TextView small = Ui.tv(a, "صغير جدًا", 11, t.body(), t.muted());
-        // web: LTR row, both spans rtl; visual order = [كبير? صغير] - keep simple: small left, big right
+        // RTL row, both spans rtl: small right, big left.
         labels.addView(small, new LinearLayout.LayoutParams(0,-2,1f));
-        big.setGravity(Gravity.RIGHT);
+        big.setGravity(Gravity.END); // left edge = END side in RTL
         labels.addView(big, new LinearLayout.LayoutParams(0,-2,1f));
         box.addView(labels);
         // preview

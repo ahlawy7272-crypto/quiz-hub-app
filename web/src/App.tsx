@@ -273,11 +273,11 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
     return <>
         {(state.run==='notebook'||state.run==='flagged') && <p className="qz-review-banner">{runLabel(state.run)}</p>}
         {review!=='all' && <p className="qz-review-banner">مراجعة الغلط فقط · مراجعة من غير تغيير النتيجة <button type="button" className="qz-tool-btn" onClick={()=>setReview('all')}>كل أسئلة التجربة</button></p>}
-        {settings.steps && <div className="qz-progress-row" dir="ltr">
+        {settings.steps && <div className="qz-progress-row">
             <div className="qz-linear-progress" role="progressbar" aria-label="السؤال الحالي" aria-valuemin={1} aria-valuemax={viewIds.length} aria-valuenow={pos+1} aria-valuetext={`Question ${pos+1} of ${viewIds.length}`}>
-                <div className="qz-progress-rail"><span className="qz-progress-fill" style={{width:`${progress}%`}}/><span className="qz-progress-marker" style={{left:`${progress}%`}}>{pos+1}</span></div>
+                <div className="qz-progress-rail"><span className="qz-progress-fill" style={{width:`${progress}%`}}/><span className="qz-progress-marker" style={{right:`${progress}%`}}>{pos+1}</span></div>
             </div>
-            <span className="qz-progress-total" aria-hidden="true">/ {viewIds.length}</span>
+            <span className="qz-progress-total" dir="ltr" aria-hidden="true">/ {viewIds.length}</span>
             <button type="button" className="qz-tool-btn qz-icon-btn qz-map-trigger" aria-label="خريطة الأسئلة" title="خريطة الأسئلة" onClick={()=>mapSheet.current?.showModal()}><ListIcon/></button>
         </div>}
         <dialog ref={mapSheet} className="qz-ex-dialog" dir="rtl"><CloseButton label="قفل الخريطة" onClick={()=>mapSheet.current?.close()}/><p className="qz-explain-title">خريطة الأسئلة</p><div className="qz-question-map">{viewIds.map((id,p)=><button type="button" className={'qz-dot'+(id===index?' is-current':'')+(feedback&&picked[id]!==null?(picked[id]===questions[id].c?' is-right':' is-missed'):'')} key={id} onClick={()=>{jump(id);mapSheet.current?.close();}} aria-label={'السؤال '+toAr(String(p+1))}>{toAr(String(p+1))}{picked[id]!==null?' •':''}</button>)}</div></dialog>
@@ -547,7 +547,7 @@ function MockApp() {
         <div className="qz-launch" hidden={opened} dir="rtl"><h2><QuizBrand/></h2><p>اختار الاختبار وكمّل من مكانك.</p><button type="button" className="qz-btn primary" onClick={() => setOpened(true)}>افتح التجربة</button></div>
         <dialog ref={panel} className="qz-app-dialog" onCancel={(e) => { if (e.target === e.currentTarget) { if (tab!=='home') { e.preventDefault(); goHome(); } else setOpened(false); } }} onClose={(e) => { if (e.target === e.currentTarget) setOpened(false); }} dir="rtl">
         <div className={screenCls+(tab==='quiz'&&started?' qz-is-solving':'')} style={{'--qz-scale':fontPercent(settings)/100} as React.CSSProperties} aria-label="Quiz Hub، أسئلة مزاولة المهنة">
-            <header className="qz-app-head"><QuizBrand compact={tab==='quiz'&&started}/>{tab==='quiz'&&started&&<button type="button" className="qz-btn ghost qz-list-btn" onClick={goHome}>‹ القائمة</button>}{tab==='quiz'&&started&&settings.timer&&<TimerChip elapsed={settings.countdown?remaining:liveElapsed} countdown={settings.countdown}/>}<CloseButton label="قفل التجربة" onClick={() => { if (tab!=='home') goHome(); else setOpened(false); }} /></header>
+            <header className="qz-app-head">{tab==='quiz'&&started&&<button type="button" className="qz-btn ghost qz-list-btn" onClick={goHome}>› القائمة</button>}<QuizBrand compact={tab==='quiz'&&started}/>{tab==='quiz'&&started&&settings.timer&&<TimerChip elapsed={settings.countdown?remaining:liveElapsed} countdown={settings.countdown}/>}<CloseButton label="قفل التجربة" onClick={() => { if (tab!=='home') goHome(); else setOpened(false); }} /></header>
             {burst>0&&<div className="qz-confetti" key={burst} aria-hidden="true" data-testid="burst">{burstPieces.map((p,i)=><i key={i} style={{left:`${p.left}%`,width:p.size,height:p.size*1.4,background:p.color,animationDelay:`${p.delay}s`,animationDuration:`${p.duration}s`}}/>)}</div>}
             <div className="qz-scroll" ref={scroller}>
             {!(tab==='quiz'&&started)&&<div className="qz-topbar">

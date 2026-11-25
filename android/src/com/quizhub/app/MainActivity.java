@@ -260,11 +260,11 @@ public class MainActivity extends Activity {
     void refreshHeader() {
         header.removeAllViews();
         boolean solving = s.tab.equals("quiz") && s.started;
-        // Round 4: an explicit "‹ القائمة" back control on the quiz screen — the
+        // Round 4: an explicit "› القائمة" back control on the quiz screen — the
         // only way back used to be the small bottom tab or the system Back key.
         if (solving) {
             android.widget.Button back = new android.widget.Button(this);
-            back.setText("‹ القائمة");
+            back.setText("› القائمة");
             back.setAllCaps(false);
             back.setTextSize(13);
             back.setTypeface(theme.disp());
@@ -302,7 +302,7 @@ public class MainActivity extends Activity {
             purpose.setLayoutParams(pp);
             brand.addView(purpose);
         }
-        if (solving) brand.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        if (solving) brand.setGravity(Gravity.CENTER_VERTICAL | Gravity.START); // RTL start = right side, next to the back button
         header.addView(brand, new LinearLayout.LayoutParams(0, -1, 1f));
         if (solving && s.timer) {
             View tc = makeTimerChip();
@@ -323,7 +323,7 @@ public class MainActivity extends Activity {
         chip.setPadding(Ui.dp(this,10), Ui.dp(this,2), Ui.dp(this,10), Ui.dp(this,2));
         timerChipLabel = Ui.tv(this, cd?"باقي":"الوقت", 11, theme.disp(), theme.ink());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.setMargins(Ui.dp(this,5), 0, 0, 0); // gap between label and time
+        lp.setMarginEnd(Ui.dp(this,5)); // gap between label and time (label is rightmost, time to its left)
         chip.addView(timerChipLabel, lp); // RTL row: label rightmost, time to its left
         timerChipTime = Ui.timeView(this, val, 11, theme.disp(), theme.ink());
         chip.addView(timerChipTime);
