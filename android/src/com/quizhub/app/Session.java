@@ -15,6 +15,13 @@ public final class Session {
     public boolean translation=false, autoExplain=false, timer=true, quizOnly=false, countdown=false;
     public int fontPercent=100, minutes=120;
     public boolean sounds=true, fx=true; public int volume=80;
+    /** Suggestion 36: bank ids whose questions run in a random order when a
+     *  fresh exam starts. Default off (empty set). Persisted with settings. */
+    public java.util.TreeSet<String> shuffleBanks = new java.util.TreeSet<>();
+    /** Suggestion 36: true when the live run's ids are a shuffled order.
+     *  The shuffled order itself is stored in ids[], so resume keeps it;
+     *  this flag only tells ensureQs() to load questions in ids order. */
+    public boolean shuffled = false;
     // session
     public int[] ids = new int[0];
     public int[] picked = new int[0]; // -1 = null, parallel to ids
@@ -60,6 +67,8 @@ public final class Session {
             s.timer=st.optBoolean("timer",true); s.quizOnly=st.optBoolean("quizOnly"); s.countdown=st.optBoolean("countdown");
             s.sounds=st.optBoolean("sounds",true); s.fx=st.optBoolean("fx",true); s.volume=st.optInt("volume",80);
             s.fontPercent=st.optInt("fontPercent",100); s.minutes=st.optInt("minutes",120);
+            JSONArray shb=st.optJSONArray("shuffleBanks"); if(shb!=null) for(int i=0;i<shb.length();i++) s.shuffleBanks.add(shb.getString(i));
+            s.shuffled=j.optBoolean("shuffled");
             s.elapsed=j.optInt("elapsed"); s.paused=j.optBoolean("paused"); s.started=j.optBoolean("started");
             s.submitted=j.optBoolean("submitted"); s.resultElapsed=j.optInt("resultElapsed",-1);
             s.mode=j.optString("mode","study"); s.tab=j.optString("tab","home");
@@ -107,7 +116,7 @@ public final class Session {
         if (ids.length == 0) bad = true;
         if (!bad) { index = Math.min(Math.max(index, 0), ids.length - 1); return; }
         ids = bank.banks.get(0).ids.clone(); picked = new int[ids.length]; java.util.Arrays.fill(picked, -1);
-        index = 0; started = false; submitted = false; elapsed = 0; resultElapsed = -1;
+        index = 0; started = false; submitted = false; elapsed = 0; resultElapsed = -1; shuffled = false;
         favorites.clear(); wrong.clear(); history = new JSONArray();
         bankKey = bank.banks.get(0).id; setupSection = bank.banks.get(0).id; run = "all";
         notice = "لقينا تقدم محفوظ من نسخة تانية مش بنحوّله، لأن ترتيب الأسئلة القديم مش متاح هنا، فبدأنا من جديد. بياناتك القديمة محفوظة زي ما هي وتقدر تصدّرها من الإعدادات.";
@@ -134,6 +143,8 @@ public final class Session {
             st.put("retry",retry); st.put("hints",hints); st.put("hintDefault",hintDefault); st.put("translation",translation);
             st.put("autoExplain",autoExplain); st.put("timer",timer); st.put("quizOnly",quizOnly); st.put("countdown",countdown);
             st.put("sounds",sounds); st.put("fx",fx); st.put("volume",volume); st.put("fontPercent",fontPercent); st.put("minutes",minutes);
+            st.put("shuffleBanks", new JSONArray(shuffleBanks));
+            j.put("shuffled",shuffled);
             j.put("settings",st);
             j.put("elapsed",elapsed); j.put("paused",paused); j.put("started",started); j.put("submitted",submitted);
             j.put("resultElapsed",resultElapsed); j.put("mode",mode); j.put("tab",tab);

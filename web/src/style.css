@@ -421,7 +421,7 @@ body { background: var(--ds-page); }
 .qz-linear-progress {flex:1;min-width:0;padding:0 15px;}
 .qz-progress-rail {position:relative;height:4px;background:rgba(11,79,74,.18);border-radius:999px;}
 .qz-progress-fill {position:absolute;inset-inline-start:0;top:0;height:100%;background:#0b4f4a;border-radius:999px;transition:width .3s ease;}
-.qz-progress-marker {position:absolute;top:50%;transform:translate(-50%,-50%);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#0b4f4a;color:#e4f5a4;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;box-shadow:0 0 0 3px #e4f5a4;transition:right .3s ease;}
+.qz-progress-marker {position:absolute;top:50%;transform:translate(50%,-50%);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#0b4f4a;color:#e4f5a4;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;box-shadow:0 0 0 3px #e4f5a4;transition:right .3s ease;}
 .qz-progress-total {font-size:11px;font-weight:700;white-space:nowrap;color:#2f6a5f;}
 .qz-tool-btn.qz-icon-btn {display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;min-height:44px;padding:0;flex:none;font-size:20px;}
 .qz-tools .qz-icon-btn {background:transparent;border-color:transparent;}
@@ -477,7 +477,7 @@ body { background: var(--ds-page); }
 .qz-screen .qz-app-head {font-size:18px;}
 .qz-screen .qz-home-title {font-size:23px;font-weight:700;}
 .qz-screen .qz-settings-title {font-size:23px;font-weight:700;}
-.qz-screen .qz-letter {font-size:12.5px;}
+.qz-screen .qz-letter {font-size:calc(12.5px * var(--qz-scale,1));} /* Round 5 (#14): letters scale with the font toggle too */
 .qz-screen .qz-tab-label {font-size:12px;}
 
 /* Quiz Hub identity uses the supplied QH/book silhouette and the existing quiz palette. */
@@ -531,3 +531,194 @@ body { background: var(--ds-page); }
 .qz-info-list li{padding-inline-start:2px}
 .qz-set-actions > button, .qz-set-actions > div > button { flex:1; font:inherit; font-size:12px; font-weight:700; padding:8px 12px; border-radius:999px; background:transparent; color:#0b4f4a; border:1.5px solid #0b4f4a; cursor:pointer; }
 .qz-dark .qz-set-actions > button { color:#cfe98a; border-color:#cfe98a77; }
+
+/* ============ Round 5: layout (both themes) ============ */
+/* The screen is the positioning context for the side rails: absolutely
+ * positioned rails inside the scroll area stay fixed while content scrolls. */
+.qz-screen { position: relative; }
+/* Tabular numbers so the timer never wobbles as digits change. */
+.qz-timer-value, .qz-home-time bdi { font-variant-numeric: tabular-nums; }
+/* Side navigation rails: Previous / Next / back-to-list on the screen edges
+ * (RTL: السابق on the start/right edge, التالي on the end/left edge), so the
+ * bottom is free and the question + options fit on one page. */
+.qz-side-rail { position: absolute; top: 38%; z-index: 5; display: flex; flex-direction: column; gap: 8px; }
+.qz-side-start { inset-inline-start: 2px; }
+.qz-side-end { inset-inline-end: 2px; }
+.qz-side-arrow { width: 44px; height: 72px; border-radius: 999px; border: 1px solid rgba(11,79,74,.3); background: rgba(255,255,255,.55); color: #0b4f4a; font-size: 30px; font-weight: 700; font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.qz-side-arrow:disabled { opacity: .35; cursor: default; }
+.qz-side-list { height: 44px; }
+.qz-side-list svg { width: 21px; height: 21px; }
+.qz-dark .qz-side-arrow { background: #17483e; border-color: #cfe98a44; color: #e4f5a4; }
+/* One-page quiz layout (both themes, both modes): tighter vertical chrome so
+ * a typical question + all options fit on one viewport; long questions still
+ * scroll. The bigger question font from item 5 is kept. */
+.qz-is-solving .qz-progress-row { min-height: 36px; }
+.qz-is-solving .qz-progress-marker { width: 24px; height: 24px; font-size: 10px; }
+.qz-is-solving .qz-question { margin-top: 4px; }
+.qz-is-solving .qz-tools { margin-top: 6px; }
+.qz-is-solving .qz-tool-btn.qz-icon-btn { width: 40px; height: 40px; min-height: 40px; }
+.qz-is-solving .qz-options { gap: 6px; margin-top: 8px; }
+.qz-is-solving .qz-opt { min-height: 44px; padding: 6px 12px; }
+.qz-is-solving .qz-confirm { margin-top: 10px; }
+.qz-is-solving .qz-home-cta { margin-top: 10px; }
+.qz-is-solving .qz-scroll { padding-bottom: 16px; }
+
+/* ============ Round 5: the new design theme (.qz-design-new) ============
+ * Everything below is scoped to the new design. The "current" design keeps
+ * the base CSS above untouched. Fonts: only the bundled IBM Plex Sans Arabic
+ * (body/questions/options/explanations) and Readex Pro (headings/buttons/
+ * timer/numbers) — no new fonts. */
+.qz-screen.qz-design-new { background: #F5F3EE; }
+.qz-app-dialog:has(.qz-design-new) { background: #F5F3EE; }
+.qz-screen.qz-design-new.qz-dark { background: #0b3b37; }
+.qz-app-dialog:has(.qz-design-new.qz-dark) { background: #0b3b37; }
+.qz-app-dialog:has(.qz-design-new.qz-dark)::backdrop { background: #072e2b; }
+.qz-design-new.qz-dark .qz-btn.primary, .qz-design-new.qz-dark .qz-set-seg-btn.is-on { color: #0b3b37; }
+.qz-design-new.qz-dark .qz-tab.is-active .qz-tab-icon { color: #0b3b37; border-color: #0b3b37; }
+.qz-design-new.qz-dark .qz-exam-card.is-live .qz-exam-card-name, .qz-design-new.qz-dark .qz-exam-card.is-live .qz-exam-card-meta, .qz-design-new.qz-dark .qz-exam-card.is-live .qz-exam-card-status { color: #0b3b37; }
+.qz-design-new.qz-dark .qz-tools .qz-icon-btn.is-open .qz-icon-chip { color: #0b3b37; }
+.qz-design-new.qz-dark .qz-flag-btn.is-open .qz-icon-chip { color: #0b3b37; }
+.qz-design-new.qz-dark .qz-progress-marker { box-shadow: 0 0 0 3px #0b3b37; }
+/* (12 + timer feedback) The timer is a designed gold pill: clock icon +
+ * tabular numbers; calm red in the last 5 minutes of a countdown. */
+.qz-design-new .qz-timer { color: #b98a2f; border-color: #b98a2f; font-size: 13px; font-weight: 700; padding: 6px 12px; min-height: 36px; }
+.qz-design-new .qz-timer .qz-clock, .qz-design-new .qz-timer-label { color: #b98a2f; }
+.qz-design-new .qz-timer-value { font-weight: 700; }
+.qz-design-new .qz-timer-low { color: #b3402f; border-color: #b3402f; }
+.qz-design-new .qz-timer-low .qz-clock, .qz-design-new .qz-timer-low .qz-timer-label { color: #b3402f; }
+.qz-screen.qz-design-new.qz-is-solving .qz-timer { font-size: 13px; padding: 6px 12px; min-height: 36px; }
+.qz-design-new.qz-dark .qz-timer { color: #d4a24c; border-color: #d4a24c; }
+.qz-design-new.qz-dark .qz-timer .qz-clock, .qz-design-new.qz-dark .qz-timer-label { color: #d4a24c; }
+.qz-design-new.qz-dark .qz-timer-low { color: #ff9d94; border-color: #ff9d94; }
+.qz-design-new.qz-dark .qz-timer-low .qz-clock, .qz-design-new.qz-dark .qz-timer-low .qz-timer-label { color: #ff9d94; }
+/* (1) "Continue where you left off" hero card. */
+.qz-design-new .qz-hero-card { background: rgba(255,255,255,.65); border: 1.5px solid #b98a2f; border-radius: 18px; padding: 14px 16px; }
+.qz-design-new .qz-hero-name { margin: 0; font-size: 16px; font-weight: 700; color: #0b3f3b; font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; }
+.qz-design-new .qz-hero-sub { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #2f6a5f; }
+.qz-design-new .qz-hero-bar { height: 4px; background: rgba(11,79,74,.18); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+.qz-design-new .qz-hero-bar span { display: block; height: 100%; background: #b98a2f; border-radius: 999px; }
+.qz-design-new .qz-hero-card .qz-action-stack { margin-top: 12px; }
+.qz-design-new.qz-dark .qz-hero-card { background: #17483e; border-color: #d4a24c; }
+.qz-design-new.qz-dark .qz-hero-name { color: #e4f5a4; }
+.qz-design-new.qz-dark .qz-hero-sub { color: #b9d5b4; }
+.qz-design-new.qz-dark .qz-hero-bar { background: #cfe98a33; }
+.qz-design-new.qz-dark .qz-hero-bar span { background: #d4a24c; }
+/* (7) Exam-type badge per card. */
+.qz-design-new .qz-exam-card-top { display: flex; align-items: flex-start; gap: 6px; width: 100%; }
+.qz-design-new .qz-exam-card-top .qz-exam-card-name { flex: 1; min-width: 0; }
+.qz-design-new .qz-exam-badge { flex: none; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; }
+.qz-design-new .qz-badge-0 { background: rgba(11,79,74,.12); color: #0b4f4a; }
+.qz-design-new .qz-badge-1 { background: rgba(185,138,47,.16); color: #b98a2f; }
+.qz-design-new .qz-badge-2 { background: rgba(46,125,91,.14); color: #2e7d5b; }
+.qz-design-new.qz-dark .qz-badge-0 { background: #cfe98a33; color: #cfe98a; }
+.qz-design-new.qz-dark .qz-badge-1 { background: rgba(212,162,76,.2); color: #d4a24c; }
+.qz-design-new.qz-dark .qz-badge-2 { background: rgba(127,208,138,.2); color: #7fd08a; }
+.qz-design-new .qz-exam-card.is-live .qz-exam-badge { background: rgba(255,255,255,.2); color: #e4f5a4; }
+/* (2) Gold progress line inside each exam card (in-progress exams only). */
+.qz-design-new .qz-exam-bar { display: block; height: 4px; background: rgba(11,79,74,.18); border-radius: 999px; overflow: hidden; margin: 2px 0; }
+.qz-design-new .qz-exam-bar span { display: block; height: 100%; background: #b98a2f; border-radius: 999px; }
+.qz-design-new.qz-dark .qz-exam-bar { background: #cfe98a33; }
+.qz-design-new.qz-dark .qz-exam-bar span { background: #d4a24c; }
+/* (16) Year section headers stay stuck at the top while scrolling. */
+.qz-design-new .qz-year-label { position: sticky; top: 0; z-index: 2; background: #F5F3EE; padding: 6px 6px 4px; margin: 0; font-size: 14px; color: #0b3f3b; }
+.qz-design-new.qz-dark .qz-year-label { background: #0b3b37; color: #e4f5a4; }
+/* (4) Gold score ring on the result screen. */
+.qz-design-new .qz-score-ring-wrap { display: flex; flex-direction: column; align-items: center; padding: 16px 0 10px; }
+.qz-design-new .qz-score-ring { position: relative; width: 150px; height: 150px; }
+.qz-design-new .qz-score-ring svg { width: 150px; height: 150px; display: block; }
+.qz-design-new .qz-ring-rail { fill: none; stroke: rgba(11,79,74,.18); stroke-width: 10; }
+.qz-design-new .qz-ring-arc { fill: none; stroke: #b98a2f; stroke-width: 10; stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+.qz-design-new .qz-ring-pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; color: #0b3f3b; }
+.qz-design-new .qz-ring-sub { font-size: 14px; font-weight: 600; color: #2f6a5f; margin-top: 8px; }
+.qz-design-new.qz-dark .qz-ring-rail { stroke: #cfe98a33; }
+.qz-design-new.qz-dark .qz-ring-arc { stroke: #d4a24c; }
+.qz-design-new.qz-dark .qz-ring-pct { color: #e4f5a4; }
+.qz-design-new.qz-dark .qz-ring-sub { color: #b9d5b4; }
+.qz-fx .qz-design-new .qz-score-ring { animation: qz-pop 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
+/* (17) Per-bank score bars under the total. */
+.qz-design-new .qz-per-bank { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.qz-design-new .qz-per-bank-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700; }
+.qz-design-new .qz-per-bank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qz-design-new .qz-per-bank-bar { height: 4px; background: rgba(11,79,74,.18); border-radius: 999px; overflow: hidden; margin-top: 4px; }
+.qz-design-new .qz-per-bank-bar span { display: block; height: 100%; background: #b98a2f; border-radius: 999px; }
+.qz-design-new.qz-dark .qz-per-bank-bar { background: #cfe98a33; }
+.qz-design-new.qz-dark .qz-per-bank-bar span { background: #d4a24c; }
+/* (8) Full-width gold confirm / hero button. */
+.qz-design-new .qz-btn.qz-gold { background: #b98a2f; color: #fff; width: 100%; }
+.qz-design-new.qz-dark .qz-btn.qz-gold { background: #d4a24c; color: #0b3b37; }
+/* (5) Bigger question font + more line spacing (line-height already 1.75). */
+.qz-screen.qz-design-new .qz-q-en { font-size: calc(18px * var(--qz-scale, 1)); line-height: 1.7; }
+/* (5) Gold border on the selected/pending answer. */
+.qz-screen.qz-design-new .qz-opt.is-pending { border-color: #b98a2f; }
+.qz-screen.qz-design-new.qz-dark .qz-opt.is-pending { border-color: #d4a24c; }
+/* (13) Bigger audio button + animated waveform while playing. */
+.qz-design-new .qz-tool-btn.qz-audio-btn { width: 52px; height: 52px; min-height: 52px; }
+.qz-design-new .qz-wave { display: inline-flex; align-items: center; gap: 3px; height: 28px; flex: none; }
+.qz-design-new .qz-wave i { width: 3px; height: 16px; border-radius: 2px; background: #b98a2f; transform: scaleY(.4); }
+.qz-design-new .qz-wave.is-playing i { animation: qz-wave-bounce .7s ease-in-out infinite; }
+.qz-design-new .qz-wave.is-playing i:nth-child(2) { animation-delay: .15s; }
+.qz-design-new .qz-wave.is-playing i:nth-child(3) { animation-delay: .3s; }
+.qz-design-new .qz-wave.is-playing i:nth-child(4) { animation-delay: .45s; }
+.qz-design-new.qz-dark .qz-wave i { background: #d4a24c; }
+@keyframes qz-wave-bounce { 0%, 100% { transform: scaleY(.4); } 50% { transform: scaleY(1); } }
+/* (14) Font-size toggle on the quiz screen. */
+.qz-design-new .qz-font-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.qz-design-new .qz-font-row-label { font-size: 12px; font-weight: 700; color: #2f6a5f; }
+.qz-design-new .qz-font-step { font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; font-size: 13px; font-weight: 700; min-width: 44px; min-height: 36px; border-radius: 999px; border: 1.5px solid rgba(11,79,74,.3); background: rgba(255,255,255,.55); color: #0b4f4a; cursor: pointer; }
+.qz-design-new .qz-font-row-pct { font-size: 12px; font-weight: 700; }
+.qz-design-new.qz-dark .qz-font-row-label { color: #b9d5b4; }
+.qz-design-new.qz-dark .qz-font-step { background: #17483e; border-color: #cfe98a44; color: #e4f5a4; }
+/* (9) Explanation card: gold border + large audio button inside. Content
+ * (written explanation, why, source) is unchanged — the button is added. */
+.qz-design-new .qz-ex-dialog.qz-ex-gold { border: 1.5px solid #b98a2f; }
+.qz-design-new.qz-dark .qz-ex-dialog.qz-ex-gold { border-color: #d4a24c; }
+.qz-design-new .qz-ex-audio { width: 100%; min-height: 52px; font-size: 15px; background: #b98a2f; color: #fff; margin-top: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.qz-design-new.qz-dark .qz-ex-audio { background: #d4a24c; color: #0b3b37; }
+/* (10) Logo scale + fade-in splash (~0.5 s) on launch. */
+@keyframes qz-splash { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+.qz-design-new .qz-brand-mark { animation: qz-splash .5s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Suggestion 32: the result ring fills gradually up to the score (~1 s). */
+.qz-design-new .qz-ring-arc { transition: stroke-dashoffset 1s ease; }
+/* Suggestion 31: exam name chip at the top of the quiz screen. */
+.qz-exam-chip { display:flex; justify-content:center; margin:2px 0 6px; }
+.qz-exam-chip span { font-family:'Readex Pro',Tahoma,'Segoe UI',sans-serif; font-size:12.5px; color:#5a6b68; background:rgba(255,255,255,.55); border:1px solid rgba(11,79,74,.2); border-radius:999px; padding:5px 14px; }
+.qz-dark .qz-exam-chip span { background:rgba(255,255,255,.08); border-color:rgba(207,233,138,.25); color:#cfe8e0; }
+/* Suggestion 34: focus mode — hide the timer, badges and chrome, leaving only the question + options. */
+.qz-screen.qz-focus .qz-timer, .qz-screen.qz-focus .qz-menu-btn, .qz-screen.qz-focus .qz-exam-chip, .qz-screen.qz-focus .qz-progress-row, .qz-screen.qz-focus .qz-tools { display:none; }
+.qz-focus-exit { position:absolute; top:8px; inset-inline-start:8px; z-index:5; font:inherit; font-size:12.5px; font-weight:600; color:#0b4f4a; background:rgba(255,255,255,.55); border:1.5px solid rgba(11,79,74,.3); border-radius:999px; padding:6px 14px; min-height:36px; cursor:pointer; }
+.qz-dark .qz-focus-exit { color:#e4f5a4; background:rgba(23,72,62,.8); border-color:rgba(207,233,138,.35); }
+
+/* Side navigation drawer (replaces the old header "› القائمة" button). */
+.qz-menu-btn { padding:6px 10px; min-height:40px; }
+.qz-drawer-wrap { position:absolute; inset:0; z-index:30; visibility:hidden; }
+.qz-drawer-wrap.is-open { visibility:visible; }
+.qz-drawer-scrim { position:absolute; inset:0; background:rgba(7,46,43,.45); opacity:0; transition:opacity .25s ease; }
+.qz-drawer-wrap.is-open .qz-drawer-scrim { opacity:1; }
+.qz-drawer { position:absolute; top:0; bottom:0; inset-inline-start:0; width:min(280px,82%); background:#fff; box-shadow:-4px 0 24px rgba(0,0,0,.18); transform:translateX(102%); transition:transform .25s ease; display:flex; flex-direction:column; padding:18px 16px; }
+.qz-drawer-wrap.is-open .qz-drawer { transform:translateX(0); }
+.qz-design-new .qz-drawer { background:#f5f3ee; }
+.qz-dark .qz-drawer { background:#0b3b37; color:#e4f5a4; box-shadow:-4px 0 24px rgba(0,0,0,.4); }
+.qz-drawer-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.qz-drawer-title { font-family:'Readex Pro',Tahoma,'Segoe UI',sans-serif; font-size:17px; font-weight:700; }
+.qz-drawer-x { font:inherit; font-size:15px; background:transparent; border:1.5px solid rgba(11,79,74,.3); color:inherit; border-radius:999px; width:36px; height:36px; cursor:pointer; }
+.qz-drawer-nav { display:flex; flex-direction:column; gap:6px; }
+.qz-drawer-item { font:inherit; font-size:15px; font-weight:600; text-align:start; background:transparent; border:1.5px solid transparent; border-radius:12px; padding:12px 14px; cursor:pointer; color:inherit; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.qz-drawer-item:hover { background:rgba(11,79,74,.07); }
+.qz-drawer-item:disabled { opacity:.45; cursor:default; }
+.qz-drawer-badge { font-family:'Readex Pro',Tahoma,'Segoe UI',sans-serif; font-size:12px; background:#d4a24c; color:#fff; border-radius:999px; padding:2px 9px; }
+.qz-drawer-theme { margin-top:auto; padding-top:14px; }
+
+/* Top-bar simplification (feedback 2026-11-25): the header is only hamburger +
+   brand + timer — the brand subtitle is gone (QuizBrand is always compact),
+   the X is hidden in the quiz, and the font toggle moved into the drawer. */
+.qz-app-head { gap: 10px; padding: 10px 16px; min-height: 52px; }
+.qz-screen.qz-is-solving .qz-app-head { gap: 10px; padding: 0 16px; }
+.qz-drawer-theme .qz-font-row { margin: 0 0 12px; }
+
+/* Swipe navigation (item 20): the quiz stage handles horizontal swipes itself,
+   so tell the browser not to turn a right swipe into back-navigation
+   (without this, a right swipe left the app for about:blank). */
+.qz-stage { touch-action: pan-y; }
+.qz-scroll { overscroll-behavior: none; }
+.qz-screen { touch-action: pan-y; }

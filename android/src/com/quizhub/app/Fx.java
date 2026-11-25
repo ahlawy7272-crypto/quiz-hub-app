@@ -34,6 +34,52 @@ public final class Fx {
             android.animation.PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, Ui.dp(a, 8), 0f)), 120, 0, new DecelerateInterpolator());
     }
 
+    /** Round 5: logo splash — gentle scale + fade-in on launch (~0.5 s). */
+    public static void splash(MainActivity a, View v) {
+        if (!on(a)) return;
+        v.setAlpha(0f); v.setScaleX(0.85f); v.setScaleY(0.85f);
+        go(ObjectAnimator.ofPropertyValuesHolder(v,
+            android.animation.PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f),
+            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 0.85f, 1f),
+            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.85f, 1f)), 500, 0, new DecelerateInterpolator());
+    }
+
+    /** Round 5: gentle haptic (short vibration) on select/confirm. Tied to
+     *  the fx/calm settings like the other motion effects.
+     *  VIBRATE is a normal permission, declared in the manifest — no runtime prompt. */
+    public static void buzz(MainActivity a) {
+        if (!on(a)) return;
+        try {
+            android.os.Vibrator vib = (android.os.Vibrator) a.getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            if (vib == null || !vib.hasVibrator()) return;
+            if (android.os.Build.VERSION.SDK_INT >= 26)
+                vib.vibrate(android.os.VibrationEffect.createOneShot(18, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+            else vib.vibrate(18);
+        } catch (Exception ignore) {}
+    }
+
+    /** Answer-result vibration (round-5 follow-up): a short gentle buzz for a
+     *  correct answer, a distinct double-buzz for a wrong one. Works in BOTH
+     *  themes and both modes, gated on the same fx/calm haptics setting as
+     *  buzz(). Fire-and-forget — it never delays the explanation card. */
+    public static void resultBuzz(MainActivity a, boolean correct) {
+        if (!on(a)) return;
+        try {
+            android.os.Vibrator vib = (android.os.Vibrator) a.getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            if (vib == null || !vib.hasVibrator()) return;
+            if (correct) {
+                if (android.os.Build.VERSION.SDK_INT >= 26)
+                    vib.vibrate(android.os.VibrationEffect.createOneShot(60, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                else vib.vibrate(60);
+            } else {
+                long[] pattern = {0, 60, 80, 60}; // buzz, gap, buzz
+                if (android.os.Build.VERSION.SDK_INT >= 26)
+                    vib.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1));
+                else vib.vibrate(pattern, -1);
+            }
+        } catch (Exception ignore) {}
+    }
+
     /** Small scale pop (web qz-pop / qz-press): 0.97 -> 1.012 -> 1. */
     public static void pop(MainActivity a, View v, long ms) {
         if (!on(a)) return;

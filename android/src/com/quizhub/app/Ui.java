@@ -60,6 +60,8 @@ public final class Ui {
     public static TextView timeView(Context c, int seconds, float sp, android.graphics.Typeface tf, int color) {
         TextView t = tv(c, lre(formatTime(seconds)), sp, tf, color);
         t.setTextDirection(View.TEXT_DIRECTION_LTR);
+        // Round 5: tabular numbers so the timer never wobbles as digits change.
+        t.setFontFeatureSettings("tnum");
         return t;
     }
 }

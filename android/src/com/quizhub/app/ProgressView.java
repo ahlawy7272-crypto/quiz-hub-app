@@ -32,7 +32,10 @@ public final class ProgressView extends View {
     }
     public void set(int pos, int total, Theme t) {
         progress = total > 1 ? Math.max(0, pos) / (float)(total - 1) : 1f;
-        label = String.valueOf(pos + 1);
+        // Round 5 (feedback): the number travels with the bar inside the marker,
+        // in Arabic-Indic digits like the rest of the Arabic UI — never as a
+        // separate "سؤال X من Y" line above the bar.
+        label = Ui.toAr(String.valueOf(pos + 1));
         text.setTextSize(Ui.dp(getContext(), 11));
         invalidate();
     }
@@ -48,6 +51,11 @@ public final class ProgressView extends View {
         float x0 = inset, x1 = w - inset;
         c.drawRoundRect(new RectF(x0, cy - railH/2, x1, cy + railH/2), railH/2, railH/2, rail);
         float mx = x1 - (x1 - x0) * progress; // RTL: progress advances from the right
+        // Keep the whole marker circle on screen: clamp its centre inside the view
+        // (the rail inset is 15dp but the marker radius + ring is 17dp, so the
+        // unclamped circle nicked 2dp off the edge at the first/last question).
+        float mEdge = mR + Ui.dp(getContext(), 3);
+        mx = Math.max(mEdge, Math.min(w - mEdge, mx));
         c.drawRoundRect(new RectF(Math.min(mx, x1 - railH), cy - railH/2, x1, cy + railH/2), railH/2, railH/2, fill);
         c.drawCircle(mx, cy, mR + Ui.dp(getContext(), 3), markerRing);
         c.drawCircle(mx, cy, mR, marker);

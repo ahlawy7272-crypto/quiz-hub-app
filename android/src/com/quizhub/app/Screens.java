@@ -45,6 +45,84 @@ final class Screens {
         else b.setBackground(Ui.roundStroke(Color.TRANSPARENT, dp(a,999), t.dark?0x77cfe98a:Theme.L_TEAL, dp(a,1.5f)));
         b.setTextColor(primary ? t.onAccent() : (t.dark ? Theme.D_SOFT : Theme.L_TEAL));
     }
+    /** Round 5: gold button — the most prominent action (confirm, hero continue). */
+    static Button goldBtn(MainActivity a, String t) {
+        Button b = btn(a, t, true);
+        b.setBackground(Ui.round(a.theme.goldFill(), dp(a,999)));
+        b.setTextColor(a.theme.onGold());
+        return b;
+    }
+    /** Round 5: thin gold progress line for an exam card / hero card.
+     *  The fill starts at the inline-start side (right in RTL). */
+    static View cardProgressBar(MainActivity a, float fraction) {
+        Theme t = a.theme;
+        LinearLayout rail = new LinearLayout(a);
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        rail.setBackground(Ui.round(t.rail(), dp(a,999)));
+        rail.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(a,4)));
+        float f = Math.max(0f, Math.min(1f, fraction));
+        View fill = new View(a);
+        fill.setBackground(Ui.round(t.dark ? Theme.D_GOLD : Theme.L_GOLD, dp(a,999)));
+        fill.setLayoutParams(new LinearLayout.LayoutParams(0, -1, f));
+        View gap = new View(a);
+        gap.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1f - f));
+        rail.addView(fill); rail.addView(gap);
+        return rail;
+    }
+    /** Round 5: exam type derived from the name — 0 تجريبي (teal), 1 محاكاة (gold), 2 فعلي (calm green). */
+    static int examType(String name) {
+        if (name.contains("فعلي")) return 2;
+        if (name.contains("محاكاة")) return 1;
+        return 0;
+    }
+    static String examTypeLabel(int type) {
+        return type == 2 ? "فعلي" : type == 1 ? "محاكاة" : "تجريبي";
+    }
+    /** Round 5: year derived from the name (2024 / 2025 / 2026), 0 when unknown. */
+    static int examYear(String name) {
+        if (name.contains("2026")) return 2026;
+        if (name.contains("2025")) return 2025;
+        if (name.contains("2024")) return 2024;
+        return 0;
+    }
+    /** Round 5: the new design is the only design now (the "current" theme
+     *  was removed 2026-11-25). nd() stays as the single gate so the round-5
+     *  styling branches read as before; it always returns true. */
+    static boolean nd(MainActivity a) { return true; }
+
+    /** Round 5: long-press details popup for an exam card — question count,
+     *  duration, last score. Suggestion 36 adds the shuffle toggle here:
+     *  when on, a fresh start of this exam runs its questions in a random
+     *  order. The toggle only sets the preference; a live run is untouched. */
+    static void showExamDetails(MainActivity a, Bank.BankMeta m) {
+        Session s = a.s;
+        int last = lastResult(a, m);
+        LinearLayout v = new LinearLayout(a);
+        v.setOrientation(LinearLayout.VERTICAL);
+        v.setPadding(dp(a, 20), dp(a, 8), dp(a, 20), dp(a, 4));
+        String msg = Ui.toAr(String.valueOf(m.ids.length)) + " سؤال · " + Ui.toAr(String.valueOf(m.minutes)) + " د"
+            + (last >= 0 ? "\nآخر نتيجة " + Ui.toAr(String.valueOf(last)) + "٪" : "\nلم يبدأ بعد");
+        TextView info = Ui.tv(a, msg, 15, a.theme.body(), a.theme.ink());
+        v.addView(info);
+        // Shuffle toggle (label only — no explanatory copy).
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView lab = Ui.tv(a, "خلط ترتيب الأسئلة", 15, a.theme.disp(), a.theme.ink());
+        row.addView(lab, new LinearLayout.LayoutParams(0, -2, 1f));
+        android.widget.Switch sw = new android.widget.Switch(a);
+        sw.setChecked(s.shuffleBanks.contains(m.id));
+        sw.setOnCheckedChangeListener((b, on) -> {
+            if (on) s.shuffleBanks.add(m.id); else s.shuffleBanks.remove(m.id);
+            a.save();
+        });
+        row.addView(sw);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+        rp.topMargin = dp(a, 16);
+        v.addView(row, rp);
+        new android.app.AlertDialog.Builder(a).setTitle(m.name).setView(v)
+            .setPositiveButton("تمام", null).show();
+    }
     static View card(MainActivity a) {
         LinearLayout c = new LinearLayout(a);
         c.setOrientation(LinearLayout.VERTICAL);
@@ -85,7 +163,10 @@ final class Screens {
 
         if (s.started) {
             a.ensureQs();
-            add(c, detail(a, a.runLabel(s.run.equals("all") ? s.bankKey : s.run)), 6);
+            // Round 5: in the new design the hero card carries the exam name,
+            // so the separate run-label line above it is dropped (not in the
+            // submitted state, where the result card needs the context).
+            if (!nd(a) || s.submitted) add(c, detail(a, a.runLabel(s.run.equals("all") ? s.bankKey : s.run)), 6);
             if (s.submitted) { resultCard(a, c); }
             else inProgressCard(a, c);
         }
@@ -180,8 +261,10 @@ final class Screens {
         search.setSingleLine(true);
         search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
         add(c, search, 6);
+        a.homeSearch = search; // drawer "بحث" focuses this box
         LinearLayout list = new LinearLayout(a);
         list.setOrientation(LinearLayout.VERTICAL);
+        list.setTag("exam-list");
         search.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence ch, int st, int co, int af) {}
             @Override public void onTextChanged(CharSequence ch, int st, int be, int co) {}
@@ -191,9 +274,77 @@ final class Screens {
         add(c, list, 4);
     }
 
+    /** Round 5: year headers of the current exam list, for the sticky header. */
+    static java.util.ArrayList<TextView> yearHeaders = new java.util.ArrayList<TextView>();
+
+    /** Round 5: the sticky year header — a fixed overlay above the scroll area
+     *  (MainActivity.stickyYear) mirroring the topmost year header that has
+     *  scrolled under the viewport top. Hidden while the first header is
+     *  still fully visible, and outside the home tab. */
+    static void updateStickyYear(MainActivity a) {
+        if (a.stickyYear == null) return;
+        if (!nd(a) || !a.s.tab.equals("home") || yearHeaders.isEmpty()) { a.stickyYear.setVisibility(View.GONE); return; }
+        int[] scLoc = new int[2];
+        a.scroll.getLocationOnScreen(scLoc);
+        int top = scLoc[1];
+        TextView best = null;
+        for (TextView h : yearHeaders) {
+            int[] loc = new int[2];
+            h.getLocationOnScreen(loc);
+            if (loc[1] <= top + dp(a, 2)) best = h; else break;
+        }
+        if (best == null) { a.stickyYear.setVisibility(View.GONE); return; }
+        a.stickyYear.setText(best.getText());
+        a.stickyYear.setTextColor(a.theme.ink());
+        a.stickyYear.setBackgroundColor(a.theme.bg());
+        a.stickyYear.setVisibility(View.VISIBLE);
+    }
+
+    /** Two exam cards per row (RTL: first card right/start). Shared by both designs. */
+    static void addCardRows(MainActivity a, LinearLayout list, java.util.List<Bank.BankMeta> banks) {
+        for (int i = 0; i < banks.size(); i += 2) {
+            LinearLayout row = new LinearLayout(a);
+            // RTL row: first card right (start), second card left (end).
+            for (int j = i; j < Math.min(i + 2, banks.size()); j++) {
+                LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
+                if (j > i) cp.setMarginStart(dp(a, 10));
+                row.addView(examCard(a, banks.get(j)), cp);
+            }
+            if (banks.size() - i == 1) row.addView(new View(a), new LinearLayout.LayoutParams(0, -2, 1f));
+            add(list, row, 6);
+        }
+    }
+
     static void fillExamCards(MainActivity a, LinearLayout list) {
         Session s = a.s; Theme t = a.theme;
         list.removeAllViews();
+        yearHeaders.clear();
+        if (nd(a)) {
+            // Round 5: exams grouped by year (newest first) with section headers.
+            java.util.TreeMap<Integer, java.util.List<Bank.BankMeta>> byYear =
+                new java.util.TreeMap<>(java.util.Collections.reverseOrder());
+            for (Bank.BankMeta m : a.bank.banks) {
+                if (!a.bankQuery.isEmpty() && !m.name.contains(a.bankQuery)) continue;
+                int y = examYear(m.name);
+                if (!byYear.containsKey(y)) byYear.put(y, new java.util.ArrayList<Bank.BankMeta>());
+                byYear.get(y).add(m);
+            }
+            boolean any = false;
+            for (java.util.Map.Entry<Integer, java.util.List<Bank.BankMeta>> e : byYear.entrySet()) {
+                int totalQ = 0; for (Bank.BankMeta m : e.getValue()) totalQ += m.ids.length;
+                TextView h = Ui.tv(a, (e.getKey() == 0 ? "الاختبارات" : Ui.toAr(String.valueOf(e.getKey()))) + " · " + Ui.toAr(String.valueOf(totalQ)) + " سؤال", 14, t.dispB(), t.ink());
+                h.setPadding(dp(a,6), dp(a,10), dp(a,6), dp(a,4));
+                h.setTag(e.getKey());
+                add(list, h, 0);
+                yearHeaders.add(h);
+                any = true;
+                addCardRows(a, list, e.getValue());
+            }
+            if (!any) add(list, detail(a, "مفيش نتائج للبحث."), 10);
+            a.scroll.post(() -> updateStickyYear(a));
+            a.scroll.setOnScrollChangeListener((v, sx, sy, ox, oy) -> updateStickyYear(a));
+            return;
+        }
         java.util.LinkedHashMap<String, java.util.List<Bank.BankMeta>> groups = new java.util.LinkedHashMap<>();
         for (Bank.BankMeta m : a.bank.banks) {
             if (!a.bankQuery.isEmpty() && !m.name.contains(a.bankQuery)) continue;
@@ -204,20 +355,25 @@ final class Screens {
         for (java.util.Map.Entry<String, java.util.List<Bank.BankMeta>> e : groups.entrySet()) {
             int totalQ = 0; for (Bank.BankMeta m : e.getValue()) totalQ += m.ids.length;
             add(list, Ui.tv(a, (e.getKey().equals("tests") ? "الاختبارات" : e.getKey()) + " · " + Ui.toAr(String.valueOf(totalQ)) + " سؤال", 12, t.dispB(), t.muted()), 10);
-            for (int i = 0; i < e.getValue().size(); i += 2) {
-                any = true;
-                LinearLayout row = new LinearLayout(a);
-                // RTL row: first card right (start), second card left (end).
-                for (int j = i; j < Math.min(i + 2, e.getValue().size()); j++) {
-                    LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -2, 1f);
-                    if (j > i) cp.setMarginStart(dp(a, 10));
-                    row.addView(examCard(a, e.getValue().get(j)), cp);
-                }
-                if (e.getValue().size() - i == 1) row.addView(new View(a), new LinearLayout.LayoutParams(0, -2, 1f));
-                add(list, row, 6);
-            }
+            any = true;
+            addCardRows(a, list, e.getValue());
         }
         if (!any) add(list, detail(a, "مفيش نتائج للبحث."), 10);
+    }
+
+    /** Round 5: small tinted exam-type badge — تجريبي teal / محاكاة gold / فعلي calm green. */
+    static TextView examBadge(MainActivity a, int type, boolean live) {
+        Theme t = a.theme;
+        TextView b = Ui.tv(a, examTypeLabel(type), 11, t.dispB(), t.ink());
+        int bg, fg;
+        if (live) { bg = 0x33ffffff; fg = t.onAccent(); }
+        else if (type == 2) { bg = t.dark ? 0x337fd08a : 0x1f2e7d5b; fg = t.dark ? Theme.D_GREEN : Theme.L_GREEN; }
+        else if (type == 1) { bg = t.dark ? 0x33d4a24c : 0x1fb98a2f; fg = t.dark ? Theme.D_GOLD : Theme.L_GOLD; }
+        else { bg = t.dark ? 0x33cfe98a : 0x1f0b4f4a; fg = t.dark ? Theme.D_SOFT : Theme.L_TEAL; }
+        b.setTextColor(fg);
+        b.setBackground(Ui.round(bg, dp(a,999)));
+        b.setPadding(dp(a,8), dp(a,3), dp(a,8), dp(a,3));
+        return b;
     }
 
     /** One exam card: name, question count + minutes, and a small status line. */
@@ -230,9 +386,29 @@ final class Screens {
         card.setBackground(Ui.roundStroke(live ? t.primary() : (selected ? t.card55() : t.card()), dp(a, 16), live ? t.primary() : (selected ? t.primary() : t.border()), dp(a, 1.5f)));
         card.setPadding(dp(a, 14), dp(a, 12), dp(a, 14), dp(a, 12));
         card.setMinimumHeight(dp(a, 96));
-        TextView name = Ui.tv(a, m.name, 14.5f, t.dispB(), live ? t.onAccent() : t.head());
-        name.setMaxLines(2);
-        card.addView(name);
+        if (nd(a)) {
+            // Round 5: name + type badge on one row (RTL: name right/start, badge left/end).
+            LinearLayout top = new LinearLayout(a);
+            top.setGravity(Gravity.CENTER_VERTICAL);
+            TextView name = Ui.tv(a, m.name, 14.5f, t.dispB(), live ? t.onAccent() : t.head());
+            name.setMaxLines(2);
+            top.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+            TextView badge = examBadge(a, examType(m.name), live);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-2, -2);
+            bp.setMarginStart(dp(a, 6));
+            top.addView(badge, bp);
+            card.addView(top);
+            // Round 5: thin gold progress line under the name for in-progress exams.
+            if (live) {
+                LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, dp(a, 4));
+                pp.topMargin = dp(a, 8);
+                card.addView(cardProgressBar(a, (s.ids.length - s.blank()) / (float) s.ids.length), pp);
+            }
+        } else {
+            TextView name = Ui.tv(a, m.name, 14.5f, t.dispB(), live ? t.onAccent() : t.head());
+            name.setMaxLines(2);
+            card.addView(name);
+        }
         TextView count = Ui.tv(a, Ui.toAr(String.valueOf(m.ids.length)) + " سؤال · " + Ui.toAr(String.valueOf(m.minutes)) + " د", 12, t.body(), live ? t.onAccent() : t.muted());
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2); cp.topMargin = dp(a, 4);
         card.addView(count, cp);
@@ -241,6 +417,7 @@ final class Screens {
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2); sp.topMargin = dp(a, 4);
         card.addView(st, sp);
         card.setOnClickListener(v -> a.onExamCard(m));
+        if (nd(a)) card.setOnLongClickListener(v -> { showExamDetails(a, m); return true; }); // Round 5: long-press details popup
         return card;
     }
 
@@ -290,6 +467,49 @@ final class Screens {
     // ---------- in-progress session card ----------
     static void inProgressCard(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme;
+        if (nd(a)) {
+            // Round 5 (#1): "continue where you left off" hero card — the most
+            // recently played exam (the live session), with its name, current
+            // question, a gold progress line and a gold "كمّل" button.
+            String name = a.runLabel(s.run.equals("all") ? s.bankKey : s.run);
+            int answered = s.ids.length - s.blank();
+            LinearLayout card = new LinearLayout(a);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackground(Ui.roundStroke(t.card55(), dp(a,18), t.dark ? Theme.D_GOLD : Theme.L_GOLD, dp(a,1.5f)));
+            card.setPadding(dp(a,16), dp(a,14), dp(a,16), dp(a,14));
+            card.addView(Ui.tv(a, name, 16, t.dispB(), t.head()));
+            // One RTL run, Arabic-Indic digits — never a mixed bidi fragment.
+            TextView prog = Ui.tv(a, "سؤال " + Ui.toAr(String.valueOf(Math.min(answered + 1, s.ids.length))) + " من " + Ui.toAr(String.valueOf(s.ids.length))
+                    + " · " + (s.mode.equals("exam")?"امتحان":"مذاكرة"), 13, t.dispB(), t.muted());
+            LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1,-2); pp.topMargin = dp(a,6);
+            card.addView(prog, pp);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(a,4)); bp.topMargin = dp(a,10);
+            card.addView(cardProgressBar(a, answered / (float) s.ids.length), bp);
+            if (s.timer) {
+                LinearLayout tr = new LinearLayout(a);
+                tr.setOrientation(LinearLayout.HORIZONTAL);
+                tr.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                android.widget.ImageView ic = new android.widget.ImageView(a);
+                ic.setImageResource(R.drawable.ic_clock);
+                ic.setColorFilter(t.ink());
+                LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(a,16), dp(a,16));
+                ip.setMarginEnd(dp(a, 4));
+                tr.addView(ic, ip);
+                tr.addView(Ui.timeView(a, s.elapsed, 13, t.disp(), t.ink()));
+                LinearLayout.LayoutParams tp2 = new LinearLayout.LayoutParams(-1,-2); tp2.topMargin = dp(a,10);
+                card.addView(tr, tp2);
+            }
+            Button cont = goldBtn(a, "كمّل");
+            cont.setOnClickListener(v -> a.openReview("all"));
+            LinearLayout.LayoutParams cp2 = new LinearLayout.LayoutParams(-1,-2); cp2.topMargin = dp(a,12);
+            card.addView(cont, cp2);
+            Button fin = btn(a, "إنهاء وعرض النتيجة", false);
+            fin.setOnClickListener(v -> a.finishQuiz());
+            LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-1,-2); fp.topMargin = dp(a,8);
+            card.addView(fin, fp);
+            add(c, card, 12);
+            return;
+        }
         add(c, Ui.tv(a, "جاوبت " + Ui.toAr(String.valueOf(s.ids.length - s.blank())) + " من " + Ui.toAr(String.valueOf(s.ids.length))
                 + " · " + (s.mode.equals("exam")?"امتحان":"مذاكرة"), 12.5f, t.dispB(), t.muted()), 10);
         if (s.timer) {
@@ -322,13 +542,25 @@ final class Screens {
             else if (s.picked[i] >= 0) wrong++;
         }
         int blank = s.ids.length - right - wrong;
-        if (a.celebrate) { TextView br = Ui.tv(a, "برافو! نتيجة عالية 🎉", 16, t.dispB(), t.head()); br.setGravity(Gravity.CENTER); add(c, br, 10); }
-        TextView score = Ui.tv(a, Ui.lre(Ui.toAr(String.valueOf(Math.round(right * 100f / s.ids.length))) + "٪"), 48, t.dispB(), t.ink());
-        Fx.pop(a, score, 550);
-        if (a.celebrate && !a.confettiDone) { a.confettiDone = true; score.post(() -> Fx.confetti(a, true)); }
-        score.setTextDirection(View.TEXT_DIRECTION_LTR); // web renders the score in a <bdi> (LTR): digits then ٪
-        score.setGravity(Gravity.CENTER);
-        add(c, score, 16);
+        int pct = Math.round(right * 100f / s.ids.length);
+        if (nd(a)) {
+            // Round 5 (#4): gold score ring as the hero element instead of the plain percentage text.
+            // Suggestion 32: it fills gradually up to the score (no animation when fx is off / calm).
+            ScoreRingView ring = new ScoreRingView(a, t);
+            ring.animateTo(pct, t, Fx.on(a));
+            Fx.pop(a, ring, 550);
+            if (a.celebrate && !a.confettiDone) { a.confettiDone = true; ring.post(() -> Fx.confetti(a, true)); }
+            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(dp(a,150), dp(a,150));
+            rp.gravity = Gravity.CENTER_HORIZONTAL; rp.topMargin = dp(a,16);
+            c.addView(ring, rp);
+        } else {
+            TextView score = Ui.tv(a, Ui.lre(Ui.toAr(String.valueOf(pct)) + "٪"), 48, t.dispB(), t.ink());
+            Fx.pop(a, score, 550);
+            if (a.celebrate && !a.confettiDone) { a.confettiDone = true; score.post(() -> Fx.confetti(a, true)); }
+            score.setTextDirection(View.TEXT_DIRECTION_LTR); // web renders the score in a <bdi> (LTR): digits then ٪
+            score.setGravity(Gravity.CENTER);
+            add(c, score, 16);
+        }
         TextView sub = Ui.tv(a, Ui.toAr(String.valueOf(right)) + " صح من " + Ui.toAr(String.valueOf(s.ids.length)), 14, t.disp(), t.muted());
         sub.setGravity(Gravity.CENTER);
         c.addView(sub);
@@ -378,6 +610,9 @@ final class Screens {
         wr.setAlpha(wrong > 0 ? 1f : .35f);
         wr.setOnClickListener(v -> a.openReview("wrong"));
         add(c, wr, 8);
+        Button home = btn(a, "الرجوع للرئيسية", false);
+        home.setOnClickListener(v -> a.scrollHomeToList());
+        add(c, home, 8);
         // Round 4: a clear way back to the exam cards from the result screen.
         Button list = btn(a, "القائمة", false);
         list.setOnClickListener(v -> a.goToList());
@@ -411,6 +646,7 @@ final class Screens {
         int pos = view.indexOf(s.index);
         if (pos < 0) { pos = 0; s.index = view.get(0); }
         final int fpos = pos;
+        a.quizView = view; a.quizPos = fpos; // Round 5 (#20): swipe navigation reads these
         final int qi = s.index; // position in ids/qs
         Bank.Question q = qs.get(qi);
         final int chosen = s.picked[qi];
@@ -429,21 +665,37 @@ final class Screens {
             c.addView(banner);
         }
 
+        // Suggestion 34: focus mode — a small exit control at the top; the
+        // timer, chip, progress row, tools and font row are all hidden below.
+        if (a.focus) {
+            Button exitFocus = btn(a, "إنهاء التركيز", false);
+            exitFocus.setOnClickListener(v -> { a.focus = false; a.renderAll(); });
+            add(c, exitFocus, 0);
+        }
+
+        // Suggestion 31: exam name (+ year, which the exam names already
+        // carry) as a small chip at the top of the quiz screen.
+        if (!a.focus) {
+            String examName = s.run.equals("all") ? (a.sessionBank() != null ? a.sessionBank().name : "") : a.runLabel(s.run);
+            TextView chip = Ui.tv(a, examName, 12.5f, t.disp(), t.muted());
+            chip.setBackground(Ui.roundStroke(t.card55(), dp(a,999), t.border3(), dp(a,1)));
+            chip.setPadding(dp(a,14), dp(a,5), dp(a,14), dp(a,5));
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, -2);
+            cp.gravity = Gravity.CENTER_HORIZONTAL;
+            c.addView(chip, cp);
+        }
+
         // progress row (RTL: the bar fills right to left, like the web version)
-        if (s.steps) {
+        if (s.steps && !a.focus) {
             LinearLayout row = new LinearLayout(a);
             row.setGravity(Gravity.CENTER_VERTICAL);
             ProgressView pv = new ProgressView(a, t);
             pv.set(fpos, view.size(), t);
             row.addView(pv, new LinearLayout.LayoutParams(0, dp(a,28), 1f));
-            TextView total = Ui.tv(a, Ui.lre("/ " + view.size()), 11, t.dispB(), t.muted());
-            total.setTextDirection(View.TEXT_DIRECTION_LTR); // "/ 147" must keep LTR order inside the RTL row
-            total.setPadding(dp(a,8),0,dp(a,8),0);
-            row.addView(total);
             android.widget.ImageView map = iconChip(a, false, R.drawable.ic_map, "خريطة الأسئلة");
             map.setOnClickListener(v -> showMap(a, view));
-            row.addView(map, new LinearLayout.LayoutParams(dp(a,44), dp(a,44)));
-            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(a,44));
+            row.addView(map, new LinearLayout.LayoutParams(dp(a,40), dp(a,40)));
+            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(a,40));
             c.addView(row, rp);
         }
 
@@ -451,8 +703,8 @@ final class Screens {
         TextView qv = Ui.tv(a, q.q, t.qSize(), t.bodyB(), t.head());
         qv.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         qv.setTextIsSelectable(true);
-        qv.setLineSpacing(0, 1.45f);
-        add(c, qv, 6);
+        qv.setLineSpacing(0, nd(a) ? 1.7f : 1.45f); // Round 5 (#5): more line spacing in the new design
+        add(c, qv, 4); // one-page layout: tighter gaps around the question
         if (a.bank.missingImage(q.gid))
             add(c, detail(a, "الصورة المشار إليها غير موجودة في المصدر."), 8);
 
@@ -471,31 +723,55 @@ final class Screens {
         }
         String clipFile = ClipPlayer.exists(a, "r" + q.gid + ".mp3") ? "r" + q.gid + ".mp3"
             : ClipPlayer.exists(a, "g" + q.gid + ".mp3") ? "g" + q.gid + ".mp3" : null;
-        if (clipFile != null && feedback && (answered || s.submitted)) {
+        // S3-9 decision (Mohamed): in study mode the audio / explanation /
+        // translation icons sit next to the question and are usable BEFORE
+        // answering; in exam mode they stay after-answer only, as today.
+        boolean preAnswer = s.mode.equals("study") && !s.submitted;
+        if (clipFile != null && feedback && (answered || s.submitted || preAnswer)) {
             final String cf = clipFile;
             boolean on0 = ClipPlayer.isPlaying(cf);
             android.widget.ImageView sp = iconChip(a, on0, on0 ? R.drawable.ic_stop : R.drawable.ic_audio, on0 ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
+            // Round 5 (#13): bigger audio button with an animated waveform while
+            // playing (new design only).
+            final WaveView wv = nd(a) ? new WaveView(a, t.dark ? Theme.D_GOLD : Theme.L_GOLD) : null;
+            if (wv != null && on0) wv.start();
             sp.setOnClickListener(v -> {
                 // Round 4: flip the icon in place — the old code ran renderAll()
                 // twice (once here, once via the toggle callback) on every audio tap.
-                boolean on = ClipPlayer.toggle(a, cf, s.volume, () -> setChip(a, sp, false, R.drawable.ic_audio));
+                boolean on = ClipPlayer.toggle(a, cf, s.volume, () -> { setChip(a, sp, false, R.drawable.ic_audio); if (wv != null) wv.stop(); });
                 setChip(a, sp, on, on ? R.drawable.ic_stop : R.drawable.ic_audio);
                 sp.setContentDescription(on ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
+                if (wv != null) { if (on) wv.start(); else wv.stop(); }
             });
-            LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
+            int chipSize = nd(a) ? 52 : 44;
+            LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(dp(a,chipSize), dp(a,chipSize));
             spp.setMarginStart(dp(a,6));
             tools.addView(sp, spp);
+            if (wv != null) {
+                LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(-2, dp(a,28));
+                wp.setMarginStart(dp(a,6));
+                wp.gravity = Gravity.CENTER_VERTICAL;
+                tools.addView(wv, wp);
+            }
         }
         // Round 4: stop the clip of another question only when one is actually
         // playing — the old code abandoned audio focus on every quiz render.
         if (ClipPlayer.isAnyPlaying() && !ClipPlayer.isPlaying("r" + q.gid + ".mp3") && !ClipPlayer.isPlaying("g" + q.gid + ".mp3")) ClipPlayer.stop();
-        if (feedback && (answered || s.submitted)) {
+        if (feedback && (answered || s.submitted || preAnswer)) {
             Button ex = toolBtn(a, "الشرح");
             ex.setTextSize(11f); ex.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6)); // user: smaller, like the chips next to it
             LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(-2, dp(a,44));
             ep.setMarginStart(dp(a,6));
             ex.setOnClickListener(v -> showExplain(a));
             tools.addView(ex, ep);
+            // Suggestion 35: share the question as a designed image (same gate
+            // as the explanation — the image carries the answer).
+            Button share = toolBtn(a, "مشاركة");
+            share.setTextSize(11f); share.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6));
+            LinearLayout.LayoutParams shp = new LinearLayout.LayoutParams(-2, dp(a,44));
+            shp.setMarginStart(dp(a,6));
+            share.setOnClickListener(v -> a.shareQuestion());
+            tools.addView(share, shp);
         }
         if (s.mode.equals("study") && !s.submitted && !answered && s.hints) {
             android.widget.ImageView hint = iconChip(a, a.hintOpen, R.drawable.ic_bulb, "التلميح");
@@ -504,7 +780,16 @@ final class Screens {
             hp.setMarginStart(dp(a,6));
             tools.addView(hint, hp);
         }
-        add(c, tools, 8);
+        {   // Suggestion 34: focus mode toggle.
+            Button foc = toolBtn(a, "تركيز");
+            foc.setTextSize(11f); foc.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6));
+            LinearLayout.LayoutParams fop = new LinearLayout.LayoutParams(-2, dp(a,44));
+            fop.setMarginStart(dp(a,6));
+            foc.setOnClickListener(v -> { a.focus = true; a.renderAll(); });
+            tools.addView(foc, fop);
+        }
+        if (!a.focus) add(c, tools, 6); // one-page layout: tighter gaps; hidden in focus mode
+
 
         if (a.trOpen && q.tr != null) {
             TextView trv = Ui.tv(a, q.tr, t.bodySize(), t.body(), t.bodyColor());
@@ -538,12 +823,12 @@ final class Screens {
             int bg = t.card75(), border = Color.TRANSPARENT;
             if (showCorrect) { bg = Theme.L_TEAL; border = Theme.L_TEAL; if (t.dark) { bg = Theme.L_TEAL; } }
             else if (showWrong) { bg = t.dark ? Theme.D_CARD : Theme.L_REDSOFT; border = t.dark ? Theme.D_MISSED : Theme.L_RED; }
-            else if (isPending) { bg = t.pendingBg(); border = t.dark ? Theme.D_TEXT : Theme.L_TEAL; }
+            else if (isPending) { bg = t.pendingBg(); border = nd(a) ? (t.dark ? Theme.D_GOLD : Theme.L_GOLD) : (t.dark ? Theme.D_TEXT : Theme.L_TEAL); } // Round 5 (#5): gold border on the selected/pending answer in the new design
             if (s.contrast && !showCorrect && !showWrong) { bg = t.dark ? Theme.D_CARD : 0xffffffff; border = t.dark ? Theme.D_TEXT : 0xff4a7a70; }
             opt.setBackground(Ui.roundStroke(bg, dp(a,999), border, dp(a,1.5f)));
             int textCol = showCorrect ? Theme.L_BG : (showWrong ? (t.dark?Theme.D_MISSED:0xffb3242b) : t.optText());
             if (s.letters) {
-                TextView letter = Ui.tv(a, String.valueOf(L[i]), 12.5f, t.disp(), showCorrect ? Theme.L_TEAL : (showWrong ? 0xffffffff : t.muted()));
+                TextView letter = Ui.tv(a, String.valueOf(L[i]), 12.5f * t.scale, t.disp(), showCorrect ? Theme.L_TEAL : (showWrong ? 0xffffffff : t.muted())); // Round 5 (#14): letters scale with the font toggle too
                 GradientDrawable lc = new GradientDrawable();
                 lc.setShape(GradientDrawable.OVAL);
                 lc.setColor(showCorrect ? Theme.L_BG : (showWrong ? (t.dark?Theme.D_MISSED:Theme.L_RED) : (t.dark ? 0x22cfe98a : 0x1a0b4f4a)));
@@ -561,41 +846,42 @@ final class Screens {
             if (a.pending != null && a.pending == i) Fx.pop(a, opt, 120);
             else if (a.popOnce && selected && (showCorrect || showWrong)) Fx.pop(a, opt, 120);
             else if (a.popOnce && showCorrect && correct && feedback) Fx.pop(a, opt, 120);
-            if (!locked) opt.setOnClickListener(v -> { if (s.confirm) { a.pending = fi; a.pendingByQuestion.put(s.index, fi); a.renderAll(); } else a.commit(fi); });
+            if (!locked) opt.setOnClickListener(v -> {
+                // Suggestion 33: double-tap an option confirms it instantly
+                // (confirm mode only — otherwise a tap already commits). The
+                // tap is tracked on MainActivity so it survives the re-render.
+                long now = System.currentTimeMillis();
+                if (s.confirm && a.pending != null && a.pending == fi && a.lastOptTapIdx == fi && now - a.lastOptTapAt < 350) {
+                    a.lastOptTapIdx = -1;
+                    a.commit(fi);
+                    return;
+                }
+                a.lastOptTapIdx = fi; a.lastOptTapAt = now;
+                if (s.confirm) { a.pending = fi; a.pendingByQuestion.put(s.index, fi); a.renderAll(); } else a.commit(fi);
+            });
             LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-1,-2);
-            olp.topMargin = dp(a, s.spacious ? 14 : 7);
+            olp.topMargin = dp(a, s.spacious ? 12 : 6); // one-page layout: tighter option gaps
             opts.addView(opt, olp);
         }
         a.popOnce = false;
-        add(c, opts, 12);
+        add(c, opts, 8);
 
         if (s.expired() && !s.submitted)
             add(c, hintBox(a, "الوقت خلص. الإجابات اتقفلت، سلّم التجربة عشان تشوف النتيجة، أو صفّر العداد من الإعدادات."), 12);
 
         if (s.confirm && a.pending != null && !s.expired() && !s.submitted) {
-            Button cb = btn(a, "تأكيد الإجابة", true);
+            Button cb = nd(a) ? goldBtn(a, "تأكيد الإجابة") : btn(a, "تأكيد الإجابة", true); // Round 5 (#8): full-width gold confirm in the new design
             cb.setOnClickListener(v -> a.commit(a.pending));
-            add(c, cb, 12);
+            add(c, cb, 8);
         }
 
-        // nav: RTL row — Previous on the right (start), Next on the left (end), matching reading direction.
-        LinearLayout nav = new LinearLayout(a);
-        Button prev = btn(a, "السابق", false);
-        prev.setEnabled(fpos > 0); prev.setAlpha(fpos > 0 ? 1f : .35f);
-        prev.setOnClickListener(v -> { s.index = view.get(fpos - 1); a.trReset(); a.save(); a.renderAll(); });
-        Button next = btn(a, "التالي", true);
-        boolean hasNext = fpos < view.size() - 1;
-        next.setEnabled(hasNext); next.setAlpha(hasNext ? 1f : .35f);
-        next.setOnClickListener(v -> { s.index = view.get(fpos + 1); a.trReset(); a.save(); a.renderAll(); });
-        nav.addView(prev, new LinearLayout.LayoutParams(0,-2,1f));
-        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0,-2,1f);
-        np.setMarginStart(dp(a,10));
-        nav.addView(next, np);
-        add(c, nav, 12);
-
+        // One-page layout: the Previous/Next/list controls moved from the bottom
+        // to side rails on the screen edges (MainActivity side rails), so the
+        // question + options fit on one viewport. The confirm button and the
+        // finish CTA stay at the bottom.
         Button cta = btn(a, s.submitted ? "الرجوع للرئيسية" : "إنهاء وعرض النتيجة", true);
         cta.setOnClickListener(v -> { if (s.submitted) a.goHome(); else a.finishQuiz(); });
-        add(c, cta, 12);
+        add(c, cta, 8);
     }
 
     /** S4-7: circular icon chip with a real vector icon + contentDescription (TalkBack), matching web's SVG chips.
@@ -705,7 +991,10 @@ final class Screens {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(a,20), dp(a,24), dp(a,20), dp(a,20));
         sv.addView(box);
-        String ttl = chosen < 0 ? "سؤال من غير إجابة" : (chosen == q.c ? "إجابة صحيحة" : "الإجابة الصحيحة");
+        // No praise/feedback words after answering (Mohamed): the green/red
+        // colours on the options are the entire feedback. The dialog title
+        // stays a neutral "الشرح".
+        String ttl = "الشرح";
         box.addView(Ui.tv(a, ttl, t.smallSize() * 1.125f, t.disp(), t.dark ? Theme.D_SOFT : Theme.L_TEAL));
         if (q.ex != null) {
             TextView ex = Ui.tv(a, q.ex, t.bodySize(), t.body(), t.bodyColor());
@@ -740,7 +1029,12 @@ final class Screens {
         box.addView(close, cp);
         d.setContentView(sv);
         if (d.getWindow() != null) {
-            d.getWindow().setBackgroundDrawable(Ui.round(t.sheet(), dp(a,22)));
+            // Round 5 (#9): the explanation is a separate card with a light gold
+            // border in the new design. The written explanation, why, source and
+            // audio buttons inside it are exactly as before.
+            d.getWindow().setBackgroundDrawable(nd(a)
+                ? Ui.roundStroke(t.sheet(), dp(a,22), t.dark ? Theme.D_GOLD : Theme.L_GOLD, dp(a,1.5f))
+                : Ui.round(t.sheet(), dp(a,22)));
             // S4-14: same height cap as the question map.
             d.getWindow().setLayout(-1, (int) (a.getResources().getDisplayMetrics().heightPixels * 0.85));
         }
@@ -748,20 +1042,35 @@ final class Screens {
     }
 
     private static Button activeAudioBtn; private static String activeAudioCap;
+    private static WaveView activeAudioWave; // Round 5: the wave of the currently playing explain-dialog clip
 
     static void addAudio(MainActivity a, LinearLayout box, Bank.Question q, String file, String caption) {
         if (!ClipPlayer.exists(a, file)) return;
-        final Button b = btn(a, "▶  " + caption, false);
+        // Round 5 (#9): in the new design the explanation audio is a large
+        // prominent gold button with a waveform while playing. The written
+        // explanation, why and source above it are untouched — the audio
+        // button is an addition, never a replacement.
+        final Button b = nd(a) ? goldBtn(a, "▶  " + caption) : btn(a, "▶  " + caption, false);
+        if (nd(a)) { b.setTextSize(15f); b.setMinHeight(dp(a,52)); b.setMinimumHeight(dp(a,52)); }
+        final WaveView wv = nd(a) ? new WaveView(a, a.theme.dark ? Theme.D_GOLD : Theme.L_GOLD) : null;
         b.setOnClickListener(v -> {
             // starting this clip stops the other one, so reset the other button's label too
-            if (activeAudioBtn != null && activeAudioBtn != b) activeAudioBtn.setText("▶  " + activeAudioCap);
-            boolean on = ClipPlayer.toggle(a, file, a.s.volume, () -> b.setText("▶  " + caption));
+            if (activeAudioBtn != null && activeAudioBtn != b) { activeAudioBtn.setText("▶  " + activeAudioCap); if (activeAudioWave != null) activeAudioWave.stop(); }
+            boolean on = ClipPlayer.toggle(a, file, a.s.volume, () -> { b.setText("▶  " + caption); if (wv != null) wv.stop(); });
             b.setText((on ? "■  " : "▶  ") + caption);
-            activeAudioBtn = on ? b : null; activeAudioCap = caption;
+            if (wv != null) { if (on) wv.start(); else wv.stop(); }
+            activeAudioBtn = on ? b : null; activeAudioCap = caption; activeAudioWave = on ? wv : null;
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2);
         lp.topMargin = dp(a,14);
-        box.addView(b, lp);
+        if (wv == null) { box.addView(b, lp); return; }
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(b, new LinearLayout.LayoutParams(0, -2, 1f));
+        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(-2, dp(a,28));
+        wp.setMarginStart(dp(a,8));
+        row.addView(wv, wp);
+        box.addView(row, lp);
     }
 
     // ================= SETTINGS =================
