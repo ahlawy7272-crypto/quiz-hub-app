@@ -478,14 +478,17 @@ final class Screens {
             sp.setOnClickListener(v -> {
                 // Round 4: flip the icon in place — the old code ran renderAll()
                 // twice (once here, once via the toggle callback) on every audio tap.
-                boolean on = ClipPlayer.toggle(a, cf, s.volume, () -> a.renderAll());
-                a.renderAll();
+                boolean on = ClipPlayer.toggle(a, cf, s.volume, () -> setChip(a, sp, false, R.drawable.ic_audio));
+                setChip(a, sp, on, on ? R.drawable.ic_stop : R.drawable.ic_audio);
+                sp.setContentDescription(on ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
             });
             LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
             spp.setMargins(dp(a,6),0,0,0);
             tools.addView(sp, spp);
         }
-        if (!ClipPlayer.isPlaying("r" + q.gid + ".mp3") && !ClipPlayer.isPlaying("g" + q.gid + ".mp3")) ClipPlayer.stop();
+        // Round 4: stop the clip of another question only when one is actually
+        // playing — the old code abandoned audio focus on every quiz render.
+        if (ClipPlayer.isAnyPlaying() && !ClipPlayer.isPlaying("r" + q.gid + ".mp3") && !ClipPlayer.isPlaying("g" + q.gid + ".mp3")) ClipPlayer.stop();
         if (feedback && (answered || s.submitted)) {
             Button ex = toolBtn(a, "الشرح");
             ex.setTextSize(11f); ex.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6)); // user: smaller, like the chips next to it
@@ -555,9 +558,9 @@ final class Screens {
             opt.addView(ot, op);
             if (showCorrect) { TextView mk = Ui.tv(a, "✓", 16, t.disp(), Theme.L_BG); opt.addView(mk); }
             else if (showWrong) { TextView mk = Ui.tv(a, "✕", 16, t.disp(), t.dark?Theme.D_MISSED:0xffb3242b); opt.addView(mk); }
-            if (a.pending != null && a.pending == i) Fx.pop(a, opt, 240);
-            else if (a.popOnce && selected && (showCorrect || showWrong)) Fx.pop(a, opt, 280);
-            else if (a.popOnce && showCorrect && correct && feedback) Fx.pop(a, opt, 280);
+            if (a.pending != null && a.pending == i) Fx.pop(a, opt, 120);
+            else if (a.popOnce && selected && (showCorrect || showWrong)) Fx.pop(a, opt, 120);
+            else if (a.popOnce && showCorrect && correct && feedback) Fx.pop(a, opt, 120);
             if (!locked) opt.setOnClickListener(v -> { if (s.confirm) { a.pending = fi; a.pendingByQuestion.put(s.index, fi); a.renderAll(); } else a.commit(fi); });
             LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-1,-2);
             olp.topMargin = dp(a, s.spacious ? 14 : 7);
@@ -599,19 +602,23 @@ final class Screens {
     /** S4-7: circular icon chip with a real vector icon + contentDescription (TalkBack), matching web's SVG chips.
      *  The gold flag in dark mode keeps the brand accent (S4-8). */
     static android.widget.ImageView iconChip(MainActivity a, boolean open, int res, String desc) {
-        Theme t = a.theme;
         android.widget.ImageView iv = new android.widget.ImageView(a);
-        iv.setImageResource(res);
         iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        setChip(a, iv, open, res);
+        iv.setPadding(dp(a,11), dp(a,11), dp(a,11), dp(a,11));
+        iv.setContentDescription(desc);
+        return iv;
+    }
+    /** Round 4: flip an icon chip's visual state in place (no full renderAll). */
+    static void setChip(MainActivity a, android.widget.ImageView iv, boolean open, int res) {
+        Theme t = a.theme;
+        iv.setImageResource(res);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
         if (open) { g.setColor(t.dark ? Theme.D_TEXT : Theme.L_TEAL); }
         else { g.setColor(t.dark ? Theme.D_CARD : 0x8cffffff); g.setStroke(dp(a,1.5f), t.dark ? Theme.D_BORDER4 : 0x4d0b4f4a); }
         iv.setBackground(g);
         iv.setColorFilter(open ? (t.dark ? Theme.L_TEAL : Theme.L_BG) : t.ink());
-        iv.setPadding(dp(a,11), dp(a,11), dp(a,11), dp(a,11));
-        iv.setContentDescription(desc);
-        return iv;
     }
     static Button toolBtn(MainActivity a, String txt) {
         Theme t = a.theme;

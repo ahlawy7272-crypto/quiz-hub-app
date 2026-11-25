@@ -104,6 +104,11 @@ public final class ClipPlayer {
         return (mp != null || fakePlay) && name.equals(playing);
     }
 
+    /** Round 4: true when any explanation clip is loaded, so callers can skip a no-op stop(). */
+    public static boolean isAnyPlaying() {
+        return mp != null || fakePlay;
+    }
+
     /** Toggle: starts the clip, or stops it if it is already playing. Returns true if now playing.
      *  volume is 0-100 and now drives the explanation clip too (S2-2). Preparation is async
      *  (S2-4) so a slow clip never freezes the UI thread. */

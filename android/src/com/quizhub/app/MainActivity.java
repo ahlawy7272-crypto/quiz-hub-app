@@ -134,6 +134,20 @@ public class MainActivity extends Activity {
         pendingRunIds = b.getIntArray("pendingRunIds");
         bankQuery = b.getString("bankQuery", "");
     }
+
+    /** Round 4: the brand logo is decoded from assets once per theme and cached —
+     *  refreshHeader() used to decode the PNG on every single renderAll(). */
+    android.graphics.Bitmap logoCache;
+    boolean logoCacheDark;
+    android.graphics.Bitmap logoBitmap() {
+        if (logoCache != null && logoCacheDark == theme.dark) return logoCache;
+        try {
+            logoCache = android.graphics.BitmapFactory.decodeStream(getAssets().open(
+                theme.dark ? "branding/quiz-hub-mark-lime.png" : "branding/quiz-hub-mark.png"));
+            logoCacheDark = theme.dark;
+        } catch (Exception ignore) { logoCache = null; }
+        return logoCache;
+    }
     void applyFrame() {
         if (theme.dark) {
             getWindow().setStatusBarColor(0xff092f2c);
@@ -271,10 +285,8 @@ public class MainActivity extends Activity {
         brand.setGravity(Gravity.CENTER_VERTICAL);
         brand.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         ImageView mark = new ImageView(this);
-        try {
-            mark.setImageBitmap(android.graphics.BitmapFactory.decodeStream(getAssets().open(
-                theme.dark ? "branding/quiz-hub-mark-lime.png" : "branding/quiz-hub-mark.png")));
-        } catch (Exception ignore) {}
+        android.graphics.Bitmap logo = logoBitmap();
+        if (logo != null) mark.setImageBitmap(logo);
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(
             solving ? Ui.dp(this,27) : Ui.dp(this,34), solving ? Ui.dp(this,24) : Ui.dp(this,28));
         brand.addView(mark, mp);
@@ -428,6 +440,14 @@ public class MainActivity extends Activity {
         confirmAction = null;
         s.tab = "home"; save(); renderAll();
     }
+    /** Round 4: back to the exam list from a quiz — pauses the exam so the clock
+     *  stops (going home used to leave it ticking), and opens the exam list
+     *  immediately instead of leaving it collapsed behind "تجربة جديدة". */
+    void goToList() {
+        if (s.started && !s.submitted) s.paused = true;
+        setupOpen = true;
+        goHome();
+    }
     /** Round 4: tapping an exam card starts that exam in the chosen mode — or
      *  resumes it when it is the live session. A live session for another exam
      *  asks for confirmation first (confirmBox -> begin()). */
@@ -436,14 +456,7 @@ public class MainActivity extends Activity {
         s.setupSection = m.id; s.minutes = m.minutes; save();
         if (s.started) { confirmAction = "start"; renderAll(); } else begin();
     }
-    /** Round 4: back to the exam list from a quiz — pauses the exam so the clock
-     *  stops (going home used to leave it ticking), and opens the exam list
-     *  immediately instead of leaving it collapsed behind "تجربة جديدة". */
-    void goToList() {
-        if (s.started && !s.submitted) s.paused = true;
-        setupOpen = true;
-        goHome();
-    }    /** S3-6: restore the progress that was live before the last backup restore. */
+    /** S3-6: restore the progress that was live before the last backup restore. */
     void undoLastRestore() {
         if (!Session.undoRestore(this)) { android.widget.Toast.makeText(this, "مفيش استرجاع سابق للتراجع عنه.", android.widget.Toast.LENGTH_SHORT).show(); return; }
         s = Session.load(this, bank);
