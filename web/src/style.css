@@ -538,3 +538,5 @@ body { background: var(--ds-page); }
 
 .qz-info-list{margin:6px 0 8px;padding-inline-start:20px;display:grid;gap:6px;font-size:14px;line-height:1.7;text-align:start}
 .qz-info-list li{padding-inline-start:2px}
+.qz-set-actions > button, .qz-set-actions > div > button { flex:1; font:inherit; font-size:12px; font-weight:700; padding:8px 12px; border-radius:999px; background:transparent; color:#0b4f4a; border:1.5px solid #0b4f4a; cursor:pointer; }
+.qz-dark .qz-set-actions > button { color:#cfe98a; border-color:#cfe98a77; }

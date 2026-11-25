@@ -81,10 +81,13 @@ public final class Backup {
             if (obj.optInt("v") != 1 || st == null || ex == null) return "الكود مش صحيح.";
             String pk = st.optString("picked", ""), fv = st.optString("favorites", "");
             JSONArray idsA = st.optJSONArray("ids"); JSONObject se = st.optJSONObject("settings");
+            // Code from the older 3,122-question build is refused: the old id order is not available, so it cannot be mapped safely. Current state is not touched.
+            if (pk.length() == 3122 || fv.length() == 3122) return "الكود ده من نسخة قديمة (٣١٢٢ سؤال) ومش مدعوم هنا. تقدمك الحالي ما اتغيّرش.";
             if (pk.length() != N || fv.length() != N || idsA == null || se == null || ex.optJSONArray("h") == null || !ex.has("w"))
-                return pk.length() == 3122 ? "الكود مش من نفس النسخة." : "الكود مش صحيح.";
+                return "الكود مش صحيح.";
             int[] ids = new int[idsA.length()];
             for (int i = 0; i < ids.length; i++) { ids[i] = idsA.getInt(i); if (ids[i] < 0 || ids[i] >= N) return "الكود مش من نفس النسخة."; }
+            Session.keepBeforeRestore(a);
             Session s = a.s;
             s.ids = ids; s.picked = new int[ids.length];
             for (int i = 0; i < ids.length; i++) { char ch = pk.charAt(ids[i]); s.picked[i] = ch == '.' ? -1 : ch - '0'; }

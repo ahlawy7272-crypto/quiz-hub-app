@@ -62,13 +62,24 @@ public final class Theme {
 
     // ---- fonts ----
     public Typeface plex400, plex500, plex600, readex500, readex600, readex700;
+    /** Asset folder for fonts; tests point it at a missing folder to check the fallback. */
+    static String fontDir = "fonts/";
+    /** How many of the 6 fonts could not be loaded and fell back to the system font (0 normally). */
+    public int fontFallbacks = 0;
+
+    private Typeface font(Context c, String file, int style) {
+        try { return Typeface.createFromAsset(c.getAssets(), fontDir + file); }
+        catch (Exception e) { fontFallbacks++; return Typeface.create(Typeface.DEFAULT, style); }
+    }
+
     public void loadFonts(Context c) {
-        plex400   = Typeface.createFromAsset(c.getAssets(), "fonts/ibm-plex-arabic-400.ttf");
-        plex500   = Typeface.createFromAsset(c.getAssets(), "fonts/ibm-plex-arabic-500.ttf");
-        plex600   = Typeface.createFromAsset(c.getAssets(), "fonts/ibm-plex-arabic-600.ttf");
-        readex500 = Typeface.createFromAsset(c.getAssets(), "fonts/readex-pro-500.ttf");
-        readex600 = Typeface.createFromAsset(c.getAssets(), "fonts/readex-pro-600.ttf");
-        readex700 = Typeface.createFromAsset(c.getAssets(), "fonts/readex-pro-700.ttf");
+        fontFallbacks = 0;
+        plex400   = font(c, "ibm-plex-arabic-400.ttf", Typeface.NORMAL);
+        plex500   = font(c, "ibm-plex-arabic-500.ttf", Typeface.NORMAL);
+        plex600   = font(c, "ibm-plex-arabic-600.ttf", Typeface.BOLD);
+        readex500 = font(c, "readex-pro-500.ttf", Typeface.NORMAL);
+        readex600 = font(c, "readex-pro-600.ttf", Typeface.BOLD);
+        readex700 = font(c, "readex-pro-700.ttf", Typeface.BOLD);
     }
     public Typeface body()   { return plex400; }
     public Typeface bodyM()  { return plex500; }

@@ -18,7 +18,7 @@ public final class Bank {
         public String q, tr, hint, ex, why, src, url, st;
         public String[] o;
         public int c;
-        public int gid; // global id (index into the 3122-question array)
+        public int gid; // global id (index into the 1,186-question list)
     }
 
     public static final class BankMeta {
@@ -54,6 +54,19 @@ public final class Bank {
         if (miss != null) for (int i = 0; i < miss.length(); i++) missingImageIds.add(miss.getInt(i));
     }
 
+    public boolean has(String id) {
+        for (BankMeta m : banks) if (m.id.equals(id)) return true;
+        return false;
+    }
+
+    /** Total number of questions across all banks (ids are 0..total-1). */
+    public int total() {
+        int n = 0;
+        for (BankMeta m : banks) n += m.ids.length;
+        return n;
+    }
+
+    /** Use has() first when the id comes from saved state; this falls back to the first bank. */
     public BankMeta byId(String id) {
         for (BankMeta m : banks) if (m.id.equals(id)) return m;
         return banks.get(0);
@@ -100,7 +113,11 @@ public final class Bank {
 
     public boolean missingImage(int gid) { return missingImageIds.contains(gid); }
 
+    /** Tests point this at a missing folder to check the startup failure path. */
+    static String assetDirOverride = null;
+
     private String readAsset(String path) throws Exception {
+        if (assetDirOverride != null && path.startsWith("bank/")) path = assetDirOverride + path.substring(5);
         InputStream in = ctx.getAssets().open(path);
         BufferedReader r = new BufferedReader(new InputStreamReader(in, "UTF-8"));
         StringBuilder sb = new StringBuilder();

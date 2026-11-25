@@ -34,6 +34,9 @@ public final class Session {
 
     private static final String PREF = "quizhub_native_v1";
 
+    /** Set when saved state pointed at a bank or question that does not exist in this build; shown once at startup. */
+    public String notice = null;
+
     public static Session load(Context c, Bank bank) {
         Session s = new Session();
         s.minutes = bank.banks.get(0).minutes;
@@ -69,8 +72,41 @@ public final class Session {
             s.picked = new int[s.ids.length];
             for (int i=0;i<s.picked.length;i++) s.picked[i] = i<pk.length() && pk.charAt(i)!='.' ? pk.charAt(i)-'0' : -1;
             s.index = Math.min(j.optInt("index"), Math.max(0, s.ids.length-1));
-        } catch (Exception ignore) {}
+            s.sanitize(bank);
+            if (s.notice != null && !p.contains("state_legacy_backup")) p.edit().putString("state_legacy_backup", raw).apply(); // keep the untouched old state
+        } catch (Exception ignore) {
+            if (!p.contains("state_legacy_backup")) p.edit().putString("state_legacy_backup", raw).apply(); // unreadable: keep it as is
+        }
         return s;
+    }
+
+    /** Saved state from another build (ids, favorites, notebook or bank that do not exist here) is NOT converted: the old id order is not available, so nothing can be mapped safely.
+     *  The untouched old state is kept (state_legacy_backup, exportable from Settings), this build starts fresh with the readable settings, and a notice says so. */
+    void sanitize(Bank bank) {
+        int total = bank.total();
+        boolean bad = !bank.has(bankKey) || !bank.has(setupSection);
+        for (int id : ids) if (id < 0 || id >= total) bad = true;
+        for (int g : favorites) if (g < 0 || g >= total) bad = true;
+        for (int g : wrong) if (g < 0 || g >= total) bad = true;
+        if (ids.length == 0) bad = true;
+        if (!bad) { index = Math.min(Math.max(index, 0), ids.length - 1); return; }
+        ids = bank.banks.get(0).ids.clone(); picked = new int[ids.length]; java.util.Arrays.fill(picked, -1);
+        index = 0; started = false; submitted = false; elapsed = 0; resultElapsed = -1;
+        favorites.clear(); wrong.clear(); history = new JSONArray();
+        bankKey = bank.banks.get(0).id; setupSection = bank.banks.get(0).id; run = "all";
+        notice = "لقينا تقدم محفوظ من نسخة تانية مش بنحوّله، لأن ترتيب الأسئلة القديم مش متاح هنا، فبدأنا من جديد. بياناتك القديمة محفوظة زي ما هي وتقدر تصدّرها من الإعدادات.";
+    }
+
+    /** The untouched saved state set aside by sanitize(), or null. */
+    public static String legacyRaw(Context c) {
+        return c.getSharedPreferences(PREF, Context.MODE_PRIVATE).getString("state_legacy_backup", null);
+    }
+
+    /** Copy the saved state aside before a backup restore replaces it (kept once per restore, newest wins). */
+    public static void keepBeforeRestore(Context c) {
+        SharedPreferences p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        String raw = p.getString("state", null);
+        if (raw != null) p.edit().putString("state_before_restore", raw).apply();
     }
 
     public void save(Context c) {

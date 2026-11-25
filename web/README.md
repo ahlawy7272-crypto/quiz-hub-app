@@ -13,3 +13,6 @@ Serve `dist/` with any static web server (for example `npx serve dist` or `pytho
 - `src/files-stub.tsx` stands in for the hosting platform's `@instinct/files` package, so progress is saved in the browser's localStorage here. On the original hosted page the platform's own storage is used.
 - Question data is in `src/bank-data.ts`, audio mapping in `src/audio-map.ts`.
 - This folder is the source that was prepared for the web version. It was built successfully with esbuild when this repo was assembled. The exact hosted page on files.instinct.com was not re-opened to compare it side by side.
+
+## Backup and old progress compatibility
+Backup codes transfer between the current web build and the current Android build (1,186 questions). There is no automatic migration of progress or notebook from the older 3,122-question build: the old question order is not available, so nothing is mapped. Old data is kept as raw text and can be exported from Settings, Backup. A 3,122-question code is refused and the current progress is left unchanged.

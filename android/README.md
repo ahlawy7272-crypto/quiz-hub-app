@@ -12,7 +12,7 @@ Signed APKs are on the Releases page of this repo. Run the commands below from t
 - `signing/quizhub-release-cert.pem`: PUBLIC certificate only. SHA-256 of the release signer: 19feecae1df35141ba896216bc7837080bfd78bc6e645b3929243058787ce203. The private key is not in this repo.
 
 ## Build
-Needs JDK 11+, Android SDK build-tools 34 (aapt2, d8, zipalign) and platform android-34.
+Needs JDK 11+, `zip`, Android SDK build-tools 34 (aapt2, d8, zipalign) and platform android-34.
 ```
 ANDROID_BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0 ANDROID_JAR=$ANDROID_HOME/platforms/android-34/android.jar tools/build.sh
 apksigner sign --ks my.p12 --out QuizHub.apk build/QuizHub-unsigned.apk
@@ -23,3 +23,6 @@ An APK signed with another key cannot update over the release APK (uninstall fir
 - Audio files must stay stored (uncompressed) in the APK. `tools/build.sh` does this.
 - Progress backup format is the web-compatible `QH2` code (Settings).
 - Tested in a Robolectric harness and with apksigner/zipalign. Real-phone playback was not confirmed at the time of this commit.
+
+## Backup and old progress compatibility
+Backup codes transfer between the current web build and the current Android build (1,186 questions). There is no automatic migration of progress or notebook from the older 3,122-question build: the old question order is not available, so nothing is mapped. Old data is kept as raw text and can be exported from Settings, Backup. A 3,122-question code is refused and the current progress is left unchanged.

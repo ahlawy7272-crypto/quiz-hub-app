@@ -900,6 +900,22 @@ final class Screens {
                 }).setNegativeButton("رجوع", null).show();
         });
         add(c, rs, 8);
+        final String legacy = Session.legacyRaw(a);
+        if (legacy != null) {
+            add(c, detail(a, "فيه تقدم محفوظ من نسخة تانية (مش متحوّل). تقدر تصدّره وتحفظه."), 6);
+            Button lg = btn(a, "تصدير البيانات القديمة", false);
+            lg.setOnClickListener(v -> {
+                android.widget.EditText et = new android.widget.EditText(a);
+                et.setText(legacy); et.setTextSize(11); et.setLayoutDirection(View.LAYOUT_DIRECTION_LTR); et.setKeyListener(null); et.setMaxLines(6);
+                new android.app.AlertDialog.Builder(a).setTitle("البيانات القديمة الأصلية").setView(et)
+                    .setPositiveButton("انسخ", (dd, w) -> {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager) a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("QH-legacy", legacy));
+                        android.widget.Toast.makeText(a, "اتنسخت البيانات القديمة.", android.widget.Toast.LENGTH_SHORT).show();
+                    }).setNegativeButton("قفل", null).show();
+            });
+            add(c, lg, 8);
+        }
 
         groupTitle(a, c, "إعادة الضبط");
         Button dflt = btn(a, "استعادة الإعدادات الافتراضية", false);

@@ -57,7 +57,13 @@ public class MainActivity extends Activity {
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         theme.loadFonts(this);
-        try { bank = new Bank(this); } catch (Exception e) { throw new RuntimeException(e); }
+        try { bank = new Bank(this); } catch (Exception e) {
+            android.widget.TextView tv = new android.widget.TextView(this);
+            tv.setText("ملفات الأسئلة جوه التطبيق مش سليمة، فمقدرش أفتحها. نزّل نسخة التطبيق تاني وثبّتها فوق الموجودة. تقدمك محفوظ.\n\n" + e);
+            tv.setPadding(48, 96, 48, 48); tv.setTextSize(16); tv.setTextDirection(View.TEXT_DIRECTION_RTL);
+            setContentView(tv);
+            return;
+        }
         s = Session.load(this, bank);
         theme.dark = s.dark;
         theme.scale = s.fontPercent / 100f;
@@ -70,6 +76,7 @@ public class MainActivity extends Activity {
         buildScreen();
         renderAll();
         startTicker();
+        if (s.notice != null) { android.widget.Toast.makeText(this, s.notice, android.widget.Toast.LENGTH_LONG).show(); s.notice = null; save(); }
     }
 
     /** White frame around the rounded card (web .qz-app-dialog::backdrop is white), dark system icons. */
@@ -241,7 +248,7 @@ public class MainActivity extends Activity {
                         && !s.paused && !s.expired() && !(s.quizOnly && !s.tab.equals("quiz"));
                 if (running) {
                     s.elapsed++;
-                    save();
+                    if (s.elapsed % 10 == 0) save(); // onPause saves too; was every second
                     if (timerChip != null && s.timer) {
                         int val = s.countdown ? s.remaining() : s.elapsed;
                         timerChipLabel.setText(s.countdown?"باقي":"الوقت");
@@ -412,5 +419,7 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
-    @Override protected void onPause() { super.onPause(); ClipPlayer.stop(); save(); }
+    @Override protected void onDestroy() { super.onDestroy(); if (handler != null) { if (ticker != null) handler.removeCallbacks(ticker); if (autoNextRun != null) handler.removeCallbacks(autoNextRun); } }
+
+    @Override protected void onPause() { super.onPause(); ClipPlayer.stop(); if (s != null) save(); }
 }

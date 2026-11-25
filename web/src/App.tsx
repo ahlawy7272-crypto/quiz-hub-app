@@ -1,7 +1,7 @@
 import quizHubMark from './branding/quiz-hub-mark.png';
 import quizHubMarkLime from './branding/quiz-hub-mark-lime.png';
 import { sourceData } from './bank-data';
-import { audioLoaders } from './audio-map';
+import { audioLoaders, generatedAudio } from './audio-map';
 import React, { useEffect, useState, useRef } from 'react';
 import { FileCard, Route, Routes, TextLink, CloseButton, CopyButton, useLocalState } from '@instinct/files';
 
@@ -193,7 +193,38 @@ const migrate = (s:Stored):Stored => {
     }
     return {...s,picked,favorites,ids,index};
 };
-const decode = (raw:Stored):Saved => { const s=migrate(raw); return {...s,settings:{...defaults,...s.settings},picked:Array.from(s.picked,v=>v==='.'?null:Number(v)),favorites:Array.from(s.favorites).flatMap((v,i)=>v==='1'?[i]:[])}; };
+const freshStored = ():Stored => encode({...initial,settings:{...defaults,minutes:banks[0].minutes}});
+// Saved state is only trusted when it matches this build (1,186 questions).
+const validStored = (s:any):boolean => !!s && typeof s.picked==='string' && s.picked.length===questions.length && typeof s.favorites==='string' && s.favorites.length===questions.length && Array.isArray(s.ids) && s.ids.length>0 && s.ids.every((n:unknown)=>typeof n==='number'&&Number.isInteger(n)&&n>=0&&n<questions.length) && /^[.0-4]*$/.test(s.picked) && typeof s.index==='number';
+// State saved by the older 3,122-question build is NOT converted: the old question order is not available here, so answers, flags and the notebook cannot be mapped safely. The raw old state and the raw old notebook are kept byte for byte under LEGACY_KEY / LEGACY_EXTRA_KEY (never overwritten) and can be exported from Settings > backup. This build starts fresh and says so.
+const LEGACY_KEY = 'quiz-banks.v2.legacy-3122';
+const LEGACY_EXTRA_KEY = 'qh-extra.v1.legacy-3122';
+const legacyInfo = { active: false };
+// The exact localStorage strings are captured before anything parses or rewrites them, so the originals survive byte for byte (whitespace, key order, even malformed JSON).
+const legacyStr = (k:string):string|null => { try { return localStorage.getItem(k); } catch { return null; } };
+const quarantineLegacy = () => {
+    try {
+        if (typeof localStorage==='undefined') return;
+        const st = localStorage.getItem('quiz-banks.v2'), ex = localStorage.getItem('qh-extra.v1');
+        if (st===null && ex===null) return;
+        let kind = '';
+        let stateOk = false;
+        if (st!==null) { try { const o = JSON.parse(st); if (o && typeof o.picked==='string') { if (o.picked.length===OLD_COUNT) kind='old'; else if (o.picked.length===questions.length) stateOk=true; else kind='other'; } else kind='other'; } catch { kind='malformed'; } }
+        // A notebook (a bit string with no version or length) is only trusted next to a valid current state. Without one it cannot be read safely, so it is quarantined.
+        const quarantineState = st!==null && !stateOk;
+        const quarantineExtra = ex!==null && !stateOk;
+        if (!quarantineState && !quarantineExtra) return;
+        if (quarantineState && localStorage.getItem(LEGACY_KEY)===null) localStorage.setItem(LEGACY_KEY, st as string);
+        if (quarantineExtra && localStorage.getItem(LEGACY_EXTRA_KEY)===null) localStorage.setItem(LEGACY_EXTRA_KEY, ex as string);
+        if (quarantineExtra) localStorage.removeItem('qh-extra.v1');
+        if (quarantineState) localStorage.removeItem('quiz-banks.v2');
+        legacyInfo.active = true;
+    } catch { /* storage unavailable */ }
+};
+quarantineLegacy();
+if (!legacyInfo.active && legacyStr(LEGACY_KEY)!==null) legacyInfo.active = true;
+const legacyExportText = ():string => { const st=legacyStr(LEGACY_KEY), ex=legacyStr(LEGACY_EXTRA_KEY); if(st===null&&ex===null) return ''; return JSON.stringify({kind:'quizhub-legacy-raw-strings',state:st,notebook:ex}); };
+const decode = (raw:Stored):Saved => { let s:any=raw; if(raw&&typeof raw.picked==='string'&&raw.picked.length===OLD_COUNT){ s={...freshStored(),settings:(raw as any).settings&&typeof (raw as any).settings==='object'?(raw as any).settings:{}}; } if(!validStored(s)) s={...freshStored(),settings:(raw as any)?.settings&&typeof (raw as any).settings==='object'?(raw as any).settings:{}}; s=migrate(s); return {...s,settings:{...defaults,...s.settings},picked:Array.from(s.picked as string,v=>v==='.'?null:Number(v)),favorites:Array.from(s.favorites as string).flatMap((v,i)=>v==='1'?[i]:[])}; };
 function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, review, setReview, goHome }: {state: Saved; update: (v: Partial<Saved>) => void; viewIds: number[]; jump:(id:number)=>void; pick:(v:number)=>void; expired:boolean; finish:()=>void; review:string; setReview:(v:string)=>void; goHome:()=>void}) {
     const {index,picked,settings,mode,submitted} = state;
     const [trOpen,setTrOpen] = useState(settings.translation);
@@ -202,7 +233,11 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
     const audioRef = useRef<HTMLAudioElement|null>(null);
     const [playing,setPlaying] = useState(false);
     const [audioSrc,setAudioSrc] = useState<string|undefined>(undefined);
-    useEffect(()=>{ const a=audioRef.current; if(a){a.pause();a.currentTime=0;} setPlaying(false); setAudioSrc(undefined); },[index]);
+    const [wantPlay,setWantPlay] = useState(false);
+    const audioReq = useRef(0);
+    useEffect(()=>{ const a=audioRef.current; if(a){a.pause();a.currentTime=0;} audioReq.current++; setWantPlay(false); setPlaying(false); setAudioSrc(undefined); },[index]);
+    // Start playback only after React has applied the new src to the <audio> element (no timers, so a slow load cannot race it).
+    useEffect(()=>{ const a=audioRef.current; if(!wantPlay||!a||!audioSrc) return; let dead=false; a.play().then(()=>{ if(!dead) setPlaying(true); }).catch(()=>{ if(!dead){ setPlaying(false); setWantPlay(false); } }); return ()=>{ dead=true; }; },[wantPlay,audioSrc]);
     useEffect(()=>()=>{ audioRef.current?.pause(); },[]);
     const [pending,setPending] = useState<number|null>(null);
     const sheet = useRef<HTMLDialogElement>(null);
@@ -231,7 +266,7 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
         <button type="button" className={'qz-tool-btn qz-icon-btn'+(trOpen?' is-open':'')} onClick={()=>setTrOpen(!trOpen)} aria-expanded={trOpen} aria-label="الترجمة" title="الترجمة"><span className="qz-icon-chip"><TranslateIcon/></span></button>
 
         <button type="button" className={'qz-tool-btn qz-icon-btn qz-flag-btn'+(state.favorites.includes(index)?' is-open':'')} onClick={()=>update({favorites:state.favorites.includes(index)?state.favorites.filter(i=>i!==index):[...state.favorites,index]})} aria-pressed={state.favorites.includes(index)} aria-label="راجعني" title="راجعني"><span className="qz-icon-chip"><FlagIcon filled={state.favorites.includes(index)}/></span></button>
-        {audioFor(index)&&((feedback&&answered)||submitted)&&<><button type="button" className={'qz-tool-btn qz-icon-btn'+(playing?' is-open':'')} onClick={()=>{const a=audioRef.current;if(!a)return;if(playing){a.pause();a.currentTime=0;setPlaying(false);}else{const ld=audioLoaders[index];(audioSrc?Promise.resolve(audioSrc):ld().then(m=>m.default)).then(u=>{setAudioSrc(u);a.src=u;return a.play();}).then(()=>setPlaying(true)).catch(()=>setPlaying(false));}}} aria-pressed={playing} aria-label={playing?'إيقاف الشرح الصوتي':'اسمع الشرح'} title={playing?'إيقاف الشرح الصوتي':'اسمع الشرح'}><span className="qz-icon-chip"><span aria-hidden="true">{playing?'⏹':'🔊'}</span></span></button><audio ref={audioRef} key={index} src={audioSrc} preload="none" onEnded={()=>setPlaying(false)}/></>}
+        {audioFor(index)&&((feedback&&answered)||submitted)&&<><button type="button" className={'qz-tool-btn qz-icon-btn'+(playing?' is-open':'')} onClick={()=>{const a=audioRef.current;if(!a)return;if(playing||wantPlay){a.pause();a.currentTime=0;audioReq.current++;setPlaying(false);setWantPlay(false);return;}const id=++audioReq.current;const ld=audioLoaders[index];(audioSrc?Promise.resolve(audioSrc):ld().then(m=>m.default)).then(u=>{if(id!==audioReq.current)return;if(audioSrc!==u)setAudioSrc(u);setWantPlay(true);}).catch(()=>{if(id===audioReq.current)setWantPlay(false);});}} aria-pressed={playing} aria-label={playing?'إيقاف الشرح الصوتي':(generatedAudio.has(index)?'اسمع الشرح (صوت مولّد)':'اسمع الشرح')} title={playing?'إيقاف الشرح الصوتي':(generatedAudio.has(index)?'اسمع الشرح (صوت مولّد، مش تسجيل الدكتور)':'اسمع الشرح')}><span className="qz-icon-chip"><span aria-hidden="true">{playing?'⏹':'🔊'}</span></span></button><audio ref={audioRef} key={index} src={audioSrc} preload="none" onEnded={()=>{setPlaying(false);setWantPlay(false);}}/></>}
         {feedback && (answered||submitted) && <button type="button" className="qz-tool-btn" onClick={()=>setExOpen(true)}>الشرح</button>}
         {mode==='study'&&!submitted&&!answered&&settings.hints&&<button type="button" className={'qz-tool-btn qz-icon-btn'+(hintOpen?' is-open':'')} onClick={()=>setHintOpen(!hintOpen)} aria-expanded={hintOpen} aria-label="التلميح" title="التلميح"><span className="qz-icon-chip"><span aria-hidden="true">💡</span></span></button>}
         </div>
@@ -247,7 +282,7 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
         {settings.confirm&&pending!==null&&!expired&&!submitted&&<button type="button" className="qz-btn primary qz-confirm" onClick={()=>commit(pending)}>تأكيد الإجابة</button>}
         <div className="qz-nav"><button type="button" className="qz-btn ghost" disabled={pos<=0} onClick={()=>jump(viewIds[pos-1])}>السابق</button><button type="button" className="qz-btn primary" disabled={pos>=viewIds.length-1} onClick={()=>jump(viewIds[pos+1])}>التالي</button></div>
         <button type="button" className="qz-btn primary qz-home-cta" onClick={submitted?goHome:finish}>{submitted?'الرجوع للرئيسية':'إنهاء وعرض النتيجة'}</button>
-        <dialog ref={sheet} className="qz-ex-dialog" onCancel={()=>setExOpen(false)} onClose={()=>setExOpen(false)} dir="rtl"><CloseButton label="قفل الشرح" onClick={()=>setExOpen(false)}/><p className="qz-explain-title">{chosen===q.c?'إجابة صحيحة':chosen===null?'سؤال من غير إجابة':'الإجابة الصحيحة'}</p><p className="qz-explain-body" dir="rtl">{q.ex}</p><p className="qz-why" dir="rtl">{q.why}</p>{q.url&&<p className="qz-src" dir="rtl">المصدر: <TextLink href={q.url}>{q.src||q.url}</TextLink></p>}</dialog>
+        <dialog ref={sheet} className="qz-ex-dialog" onCancel={()=>setExOpen(false)} onClose={()=>setExOpen(false)} dir="rtl"><CloseButton label="قفل الشرح" onClick={()=>setExOpen(false)}/><p className="qz-explain-title">{chosen===q.c?'إجابة صحيحة':chosen===null?'سؤال من غير إجابة':'الإجابة الصحيحة'}</p><p className="qz-explain-body" dir="rtl">{q.ex}</p><p className="qz-why" dir="rtl">{q.why}</p>{generatedAudio.has(index)&&<p className="qz-src" dir="rtl">الشرح الصوتي للسؤال ده مولّد، مش تسجيل الدكتور.</p>}{q.url&&<p className="qz-src" dir="rtl">المصدر: <TextLink href={q.url}>{q.src||q.url}</TextLink></p>}</dialog>
     </>;
 }
 
@@ -358,6 +393,12 @@ function BackupPanel({make,restore}:{make:()=>Promise<string>;restore:(code:stri
             <button type="button" className="qz-btn primary" disabled={busy} onClick={async()=>{setBusy(true);try{setCode(await make());setMsg('');}catch{setMsg('معرفتش أجهّز النسخة.');}setBusy(false);}}>جهّز النسخة</button>
             {code&&<><textarea className="qz-code" readOnly dir="ltr" rows={4} value={code} onFocus={e=>e.currentTarget.select()} aria-label="كود النسخة الاحتياطية"/><div className="qz-set-actions"><CopyButton text={code} label="انسخ الكود" compact/></div></>}
         </div>
+        {legacyExportText()&&<div className="qz-set-row qz-stacked">
+            <span className="qz-set-label">البيانات القديمة (٣١٢٢ سؤال)</span>
+            <p className="qz-set-detail">تقدمك ودفتر الغلطات من النسخة القديمة محفوظين زي ما كانوا ومش متحوّلين. انسخ النص ده واحفظه.</p>
+            <textarea className="qz-code" readOnly dir="ltr" rows={4} value={legacyExportText()} onFocus={e=>e.currentTarget.select()} aria-label="البيانات القديمة الأصلية"/>
+            <div className="qz-set-actions"><CopyButton text={legacyExportText()} label="انسخ البيانات القديمة"/></div>
+        </div>}
         <div className="qz-set-row qz-stacked">
             <span className="qz-set-label">استرجاع</span>
             <textarea className="qz-code" dir="ltr" rows={4} value={input} onChange={e=>{setInput(e.target.value);setConfirm(false);setMsg('');}} placeholder="الصق الكود هنا" aria-label="الصق كود النسخة"/>
@@ -502,9 +543,10 @@ function MockApp() {
             else return 'الكود مش صحيح.';
             const obj = JSON.parse(new TextDecoder().decode(raw));
             const st = obj?.s; const ex = obj?.x;
-            const okState = obj?.v===1 && st && typeof st.picked==='string' && (st.picked.length===questions.length||st.picked.length===OLD_COUNT) && typeof st.favorites==='string' && Array.isArray(st.ids) && st.ids.every((n:unknown)=>typeof n==='number') && st.settings && typeof st.settings==='object';
+            const okState = obj?.v===1 && st && typeof st.picked==='string' && st.picked.length===questions.length && typeof st.favorites==='string' && Array.isArray(st.ids) && st.ids.every((n:unknown)=>typeof n==='number') && st.settings && typeof st.settings==='object';
+            if (obj?.v===1 && st && typeof st.picked==='string' && st.picked.length===OLD_COUNT) return 'الكود ده من نسخة قديمة (٣١٢٢ سؤال) ومش مدعوم هنا. تقدمك الحالي ما اتغيّرش.';
             const okExtra = ex && typeof ex.w==='string' && Array.isArray(ex.h);
-            if (!okState || !okExtra) return 'الكود مش صحيح.';
+                        if (!okState || !okExtra) return 'الكود مش صحيح.';
             const next = encode(decode(st as Stored));
             if (next.ids.some((n:number)=>n<0||n>=questions.length)) return 'الكود مش من نفس النسخة.';
             setStored(()=>next);
@@ -513,6 +555,7 @@ function MockApp() {
         } catch { return 'الكود مش صحيح أو ناقص.'; }
     };
     const storage = (saved.status==='saved'||saved.status==='saving')&&(savedX.status==='saved'||savedX.status==='saving')?'الحفظ مفعّل على هذا المتصفح.':'الحفظ للجلسة الحالية فقط.';
+    const storageFull = storage+(legacyInfo.active?' لقينا تقدم محفوظ من نسخة قديمة (٣١٢٢ سؤال). مش بنحوّله لأن ترتيب الأسئلة القديم مش متاح هنا، فالتجربة بدأت من جديد. بياناتك القديمة محفوظة زي ما هي، وتقدر تصدّرها من الإعدادات ثم نسخة احتياطية.':'');
     const screenCls = `qz-screen qz-size-${settings.textSize}${settings.dark?' qz-dark':''}${settings.textSize==='large'?' qz-large':''}${settings.calm?' qz-calm':''}${settings.fx?' qz-fx':''}${settings.spacious?' qz-spacious':''}${settings.contrast?' qz-contrast':''}`;
 
     return (
@@ -531,7 +574,7 @@ function MockApp() {
             {!ready?<p role="status">جاري تجهيز التجربة المحفوظة…</p>:<>
             {(paused||(allAnswered&&state.mode==='study')||expired||submitted)&&started&&<p className="qz-clock-status">{expired?'الوقت خلص':submitted?'تم التسليم، العداد متوقف':allAnswered?'اكتملت الاختيارات، العداد متوقف':'العداد متوقف مؤقتًا'}</p>}
             {confirmAction&&<div className="qz-hint qz-confirm-box" role="alert"><p>{confirmAction==='finish'?'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟':'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p><div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={()=>{if(confirmAction==='start')begin(pendingRun??undefined);else{doSubmit();setConfirmAction(null);}}}>{confirmAction==='start'?'ابدأ من جديد':'سلّم التجربة'}</button><button type="button" className="qz-btn ghost" onClick={()=>setConfirmAction(null)}>رجوع</button></div></div>}
-            {tab==='home'&&<HomeScreen state={state} update={update} start={()=>{setPendingRun(null);if(started)setConfirmAction('start');else begin();}} open={open} finish={finish} storage={storage} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r=>{if(started){setPendingRun(r);setConfirmAction('start');}else begin(r);}}/>}
+            {tab==='home'&&<HomeScreen state={state} update={update} start={()=>{setPendingRun(null);if(started)setConfirmAction('start');else begin();}} open={open} finish={finish} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r=>{if(started){setPendingRun(r);setConfirmAction('start');}else begin(r);}}/>}
             {tab==='quiz'&&started&&<QuizScreen state={{...state,index:safeIndex}} update={update} viewIds={viewIds} jump={id=>update({index:id})} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome}/>}
             {tab==='quiz'&&!started&&<div className="qz-home"><p>اختار طريقة التجربة من الرئيسية الأول.</p><button type="button" className="qz-btn primary" onClick={()=>update({tab:'home'})}>إعداد التجربة</button></div>}
             {tab==='settings'&&<SettingsScreen backup={{make:makeBackup,restore:restoreBackup}} settings={settings} setSettings={v=>update({settings:v})} onReset={reset} paused={paused} setPaused={v=>update({paused:v})} resetClock={()=>update({elapsed:0})}/>}

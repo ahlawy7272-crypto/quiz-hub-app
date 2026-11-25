@@ -1,7 +1,8 @@
 #!/bin/bash
-# Builds the unsigned, aligned APK. Needs: JDK 11+ (javac), Android SDK build-tools (aapt2, d8, zipalign) and platform android.jar.
+# Builds the unsigned, aligned APK. Needs: JDK 11+ (javac), zip, Android SDK build-tools (aapt2, d8, zipalign) and platform android.jar.
 # Usage: ANDROID_BUILD_TOOLS=/path/to/build-tools/34.0.0 ANDROID_JAR=/path/to/platforms/android-34/android.jar tools/build.sh
 set -e
+for t in zip javac; do command -v $t >/dev/null || { echo "missing prerequisite: $t" >&2; exit 1; }; done
 : "${ANDROID_BUILD_TOOLS:?set ANDROID_BUILD_TOOLS}"; : "${ANDROID_JAR:?set ANDROID_JAR}"
 P="$(cd "$(dirname "$0")/.." && pwd)"; BT="$ANDROID_BUILD_TOOLS"; AJ="$ANDROID_JAR"; O="$P/build"
 rm -rf "$O"; mkdir -p "$O/gen" "$O/classes" "$O/dex"
