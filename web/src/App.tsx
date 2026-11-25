@@ -63,6 +63,17 @@ function FlagIcon({filled}:{filled:boolean}) {
     return <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 3v18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M6 4h11l-2.5 4L17 12H6z" fill={filled?'currentColor':'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg>;
 }
 
+// S4-7: real SVG icons instead of the 🔊/⏹/💡 emoji the tools row used before.
+function SpeakerIcon() {
+    return <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>;
+}
+function StopIcon() {
+    return <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>;
+}
+function BulbIcon() {
+    return <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M9.5 19h5M10.5 21.5h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>;
+}
+
 function ListIcon() {
     return (
         <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true">
@@ -157,7 +168,7 @@ function TimerChip({ elapsed, countdown = false }: { elapsed: number; countdown?
 }
 
 type Mode = 'study' | 'exam';
-type Setup = { section: string; count: number; mode: Mode };
+type Setup = { section: string; mode: Mode };
 type Run = { kind: 'notebook'|'flagged'; ids: number[] };
 type Attempt = { t: number; b: string; m: Mode; r: number; n: number; s: number };
 type Extra = { w: string; h: Attempt[] };
@@ -170,7 +181,7 @@ const toB64 = (u8: Uint8Array) => { let bin=''; for (let i=0;i<u8.length;i++) bi
 const fromB64 = (str: string) => { const bin=atob(str); const u8=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i); return u8; };
 const streamBytes = async (data: Uint8Array, T: 'CompressionStream'|'DecompressionStream'): Promise<Uint8Array> => { const C = (window as any)[T]; const st = new Blob([data as unknown as BlobPart]).stream().pipeThrough(new C('deflate-raw')); return new Uint8Array(await new Response(st).arrayBuffer()); };
 type Saved = { run?: string; bank?: string; settings: Settings; favorites: number[]; ids: number[]; picked: (number|null)[]; index: number; elapsed: number; paused: boolean; started: boolean; submitted: boolean; resultElapsed: number|null; mode: Mode; tab: 'home'|'quiz'|'settings'; setup: Setup };
-const initial: Saved = { settings: {...defaults}, favorites: [], ids: banks[0].ids, picked: questions.map(()=>null), index: 0, elapsed: 0, paused: false, started: false, submitted: false, resultElapsed: null, mode: 'study', tab: 'home', setup: {section:banks[0].id,count:banks[0].ids.length,mode:'study'} };
+const initial: Saved = { settings: {...defaults}, favorites: [], ids: banks[0].ids, picked: questions.map(()=>null), index: 0, elapsed: 0, paused: false, started: false, submitted: false, resultElapsed: null, mode: 'study', tab: 'home', setup: {section:banks[0].id,mode:'study'} };
 
 type Stored = Omit<Saved,'picked'|'favorites'> & { picked: string; favorites: string };
 const encode = (s:Saved):Stored => ({...s,picked:s.picked.map(v=>v===null?'.':String(v)).join(''),favorites:questions.map((_,i)=>s.favorites.includes(i)?'1':'0').join('')});
@@ -224,7 +235,7 @@ quarantineLegacy();
 if (!legacyInfo.active && legacyStr(LEGACY_KEY)!==null) legacyInfo.active = true;
 const legacyExportText = ():string => { const st=legacyStr(LEGACY_KEY), ex=legacyStr(LEGACY_EXTRA_KEY); if(st===null&&ex===null) return ''; return JSON.stringify({kind:'quizhub-legacy-raw-strings',state:st,notebook:ex}); };
 const decode = (raw:Stored):Saved => { let s:any=raw; if(raw&&typeof raw.picked==='string'&&raw.picked.length===OLD_COUNT){ s={...freshStored(),settings:(raw as any).settings&&typeof (raw as any).settings==='object'?(raw as any).settings:{}}; } if(!validStored(s)) s={...freshStored(),settings:(raw as any)?.settings&&typeof (raw as any).settings==='object'?(raw as any).settings:{}}; s=migrate(s); return {...s,settings:{...defaults,...s.settings},picked:Array.from(s.picked as string,v=>v==='.'?null:Number(v)),favorites:Array.from(s.favorites as string).flatMap((v,i)=>v==='1'?[i]:[])}; };
-function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, review, setReview, goHome }: {state: Saved; update: (v: Partial<Saved>) => void; viewIds: number[]; jump:(id:number)=>void; pick:(v:number)=>void; expired:boolean; finish:()=>void; review:string; setReview:(v:string)=>void; goHome:()=>void}) {
+function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, review, setReview, goHome, attemptKey }: {state: Saved; update: (v: Partial<Saved>) => void; viewIds: number[]; jump:(id:number)=>void; pick:(v:number)=>void; expired:boolean; finish:()=>void; review:string; setReview:(v:string)=>void; goHome:()=>void; attemptKey:number}) {
     const {index,picked,settings,mode,submitted} = state;
     const [trOpen,setTrOpen] = useState(settings.translation);
     const [hintOpen,setHintOpen] = useState(settings.hintDefault);
@@ -233,19 +244,29 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
     const [playing,setPlaying] = useState(false);
     const [audioSrc,setAudioSrc] = useState<string|undefined>(undefined);
     const [wantPlay,setWantPlay] = useState(false);
+    const [audioError,setAudioError] = useState(false); // S3-4: an audio failure says so instead of staying silent
     const audioReq = useRef(0);
-    useEffect(()=>{ const a=audioRef.current; if(a){a.pause();a.currentTime=0;} audioReq.current++; setWantPlay(false); setPlaying(false); setAudioSrc(undefined); },[index]);
+    useEffect(()=>{ const a=audioRef.current; if(a){a.pause();a.currentTime=0;} audioReq.current++; setWantPlay(false); setPlaying(false); setAudioSrc(undefined); setAudioError(false); },[index]);
     // Start playback only after React has applied the new src to the <audio> element (no timers, so a slow load cannot race it).
-    useEffect(()=>{ const a=audioRef.current; if(!wantPlay||!a||!audioSrc) return; let dead=false; a.play().then(()=>{ if(!dead) setPlaying(true); }).catch(()=>{ if(!dead){ setPlaying(false); setWantPlay(false); } }); return ()=>{ dead=true; }; },[wantPlay,audioSrc]);
+    // S2-2: the volume slider now drives the explanation audio too, not just the correct/wrong blips.
+    useEffect(()=>{ const a=audioRef.current; if(!wantPlay||!a||!audioSrc) return; let dead=false; a.volume=(settings.volume??80)/100; a.play().then(()=>{ if(!dead) setPlaying(true); }).catch(()=>{ if(!dead){ setPlaying(false); setWantPlay(false); setAudioError(true); } }); return ()=>{ dead=true; }; },[wantPlay,audioSrc]);
+    useEffect(()=>{ const a=audioRef.current; if(a) a.volume=(settings.volume??80)/100; },[settings.volume]);
     useEffect(()=>()=>{ audioRef.current?.pause(); },[]);
-    const [pending,setPending] = useState<number|null>(null);
+    const [pending,setPendingState] = useState<number|null>(null);
+    const pendingById = useRef<Record<number, number>>({});
+    // S2-1: a pending (unconfirmed) choice is kept per question instead of being thrown away on every navigation.
+    const setPending = (v:number|null) => {
+        if (v===null) delete pendingById.current[index]; else pendingById.current[index]=v;
+        setPendingState(v);
+    };
     const sheet = useRef<HTMLDialogElement>(null);
     const mapSheet=useRef<HTMLDialogElement>(null);
     const q = questions[index]; const chosen = picked[index]; const answered = chosen !== null;
     const feedback = submitted || mode === 'study';
     const pos = viewIds.indexOf(index);
     const progress = viewIds.length > 1 ? Math.max(0,pos)/(viewIds.length-1)*100 : 100;
-    useEffect(()=>{setTrOpen(settings.translation);setHintOpen(settings.hintDefault);setExOpen(false);setPending(null);},[index,review]);
+    useEffect(()=>{setTrOpen(settings.translation);setHintOpen(settings.hintDefault);setExOpen(false);setPendingState(pendingById.current[index] ?? null);},[index,review]);
+    useEffect(()=>{ pendingById.current={}; setPendingState(null); },[attemptKey]);
     useEffect(()=>{if(exOpen)sheet.current?.showModal();else sheet.current?.close();},[exOpen]);
     const commit = (v:number) => { pick(v);setPending(null);if(settings.autoExplain && mode==='study')setExOpen(true); };
     if(!viewIds.length) return <div className="qz-home"><h2>مفيش أسئلة هنا</h2><p>كل الإجابات صح، مفيش غلط للمراجعة.</p><button type="button" className="qz-btn primary" onClick={goHome}>ارجع للرئيسية</button></div>;
@@ -265,17 +286,18 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
         <button type="button" className={'qz-tool-btn qz-icon-btn'+(trOpen?' is-open':'')} onClick={()=>setTrOpen(!trOpen)} aria-expanded={trOpen} aria-label="الترجمة" title="الترجمة"><span className="qz-icon-chip"><TranslateIcon/></span></button>
 
         <button type="button" className={'qz-tool-btn qz-icon-btn qz-flag-btn'+(state.favorites.includes(index)?' is-open':'')} onClick={()=>update({favorites:state.favorites.includes(index)?state.favorites.filter(i=>i!==index):[...state.favorites,index]})} aria-pressed={state.favorites.includes(index)} aria-label="راجعني" title="راجعني"><span className="qz-icon-chip"><FlagIcon filled={state.favorites.includes(index)}/></span></button>
-        {audioFor(index)&&((feedback&&answered)||submitted)&&<><button type="button" className={'qz-tool-btn qz-icon-btn'+(playing?' is-open':'')} onClick={()=>{const a=audioRef.current;if(!a)return;if(playing||wantPlay){a.pause();a.currentTime=0;audioReq.current++;setPlaying(false);setWantPlay(false);return;}const id=++audioReq.current;const ld=audioLoaders[index];(audioSrc?Promise.resolve(audioSrc):ld().then(m=>m.default)).then(u=>{if(id!==audioReq.current)return;if(audioSrc!==u)setAudioSrc(u);setWantPlay(true);}).catch(()=>{if(id===audioReq.current)setWantPlay(false);});}} aria-pressed={playing} aria-label={playing?'إيقاف الشرح الصوتي':(generatedAudio.has(index)?'اسمع الشرح (صوت مولّد)':'اسمع الشرح')} title={playing?'إيقاف الشرح الصوتي':(generatedAudio.has(index)?'اسمع الشرح (صوت مولّد، مش تسجيل الدكتور)':'اسمع الشرح')}><span className="qz-icon-chip"><span aria-hidden="true">{playing?'⏹':'🔊'}</span></span></button><audio ref={audioRef} key={index} src={audioSrc} preload="none" onEnded={()=>{setPlaying(false);setWantPlay(false);}}/></>}
+        {audioFor(index)&&((feedback&&answered)||submitted)&&<><button type="button" className={'qz-tool-btn qz-icon-btn'+(playing?' is-open':'')} onClick={()=>{const a=audioRef.current;if(!a)return;if(playing||wantPlay){a.pause();a.currentTime=0;audioReq.current++;setPlaying(false);setWantPlay(false);return;}const id=++audioReq.current;const ld=audioLoaders[index];(audioSrc?Promise.resolve(audioSrc):ld().then(m=>m.default)).then(u=>{if(id!==audioReq.current)return;if(audioSrc!==u)setAudioSrc(u);setWantPlay(true);}).catch(()=>{if(id===audioReq.current){setWantPlay(false);setAudioError(true);}});}} aria-pressed={playing} aria-label={playing?'إيقاف الشرح الصوتي':(generatedAudio.has(index)?'اسمع الشرح (صوت مولّد)':'اسمع الشرح')} title={playing?'إيقاف الشرح الصوتي':(generatedAudio.has(index)?'اسمع الشرح (صوت مولّد، مش تسجيل الدكتور)':'اسمع الشرح')}><span className="qz-icon-chip"><span aria-hidden="true">{playing?<StopIcon/>:<SpeakerIcon/>}</span></span></button><audio ref={audioRef} key={index} src={audioSrc} preload="none" onEnded={()=>{setPlaying(false);setWantPlay(false);}} onError={()=>setAudioError(true)}/></>}
         {feedback && (answered||submitted) && <button type="button" className="qz-tool-btn" onClick={()=>setExOpen(true)}>الشرح</button>}
-        {mode==='study'&&!submitted&&!answered&&settings.hints&&<button type="button" className={'qz-tool-btn qz-icon-btn'+(hintOpen?' is-open':'')} onClick={()=>setHintOpen(!hintOpen)} aria-expanded={hintOpen} aria-label="التلميح" title="التلميح"><span className="qz-icon-chip"><span aria-hidden="true">💡</span></span></button>}
+        {mode==='study'&&!submitted&&!answered&&settings.hints&&<button type="button" className={'qz-tool-btn qz-icon-btn'+(hintOpen?' is-open':'')} onClick={()=>setHintOpen(!hintOpen)} aria-expanded={hintOpen} aria-label="التلميح" title="التلميح"><span className="qz-icon-chip"><span aria-hidden="true"><BulbIcon/></span></span></button>}
         </div>
+        {audioError&&<p className="qz-hint" role="status">تعذّر تشغيل الصوت، جرّب تاني.</p>}
         {trOpen&&<p className="qz-q-ar" dir="rtl">{q.tr}</p>}
         {mode==='study'&&!submitted&&!answered&&settings.hints&&hintOpen&&<p className="qz-hint" dir="rtl">{q.hint}</p>}
         <div className="qz-options" role="listbox" aria-label="الاختيارات">{q.o.map((opt,i)=>{
             const correct=i===q.c;const selected=i===chosen;
             const locked=submitted||expired||(mode==='study'&&answered&&!(settings.retry&&chosen!==q.c));
             let cls='qz-opt';if(feedback&&(answered||submitted)&&correct)cls+=' is-correct';if(feedback&&selected&&!correct)cls+=' is-wrong';if((pending===i)||(!feedback&&selected))cls+=' is-pending';
-            return <button type="button" key={opt} className={cls} dir="ltr" disabled={locked} aria-selected={selected||pending===i} onClick={()=>settings.confirm?setPending(i):commit(i)}>{settings.letters&&<span className="qz-letter" dir="ltr">{letters[i]}</span>}<span className="qz-opt-text" dir="ltr">{opt}</span>{feedback&&(answered||submitted)&&correct&&<span className="qz-mark">✓</span>}{feedback&&selected&&!correct&&<span className="qz-mark">✕</span>}</button>;
+            return <button type="button" key={i} role="option" className={cls} dir="ltr" disabled={locked} aria-selected={selected||pending===i} onClick={()=>settings.confirm?setPending(i):commit(i)}>{settings.letters&&<span className="qz-letter" dir="ltr">{letters[i]}</span>}<span className="qz-opt-text" dir="ltr">{opt}</span>{feedback&&(answered||submitted)&&correct&&<span className="qz-mark">✓</span>}{feedback&&selected&&!correct&&<span className="qz-mark">✕</span>}</button>;
         })}</div></div>
         {expired&&!submitted&&<p className="qz-hint" role="status">الوقت خلص. الإجابات اتقفلت، سلّم التجربة عشان تشوف النتيجة، أو صفّر العداد من الإعدادات.</p>}
         {settings.confirm&&pending!==null&&!expired&&!submitted&&<button type="button" className="qz-btn primary qz-confirm" onClick={()=>commit(pending)}>تأكيد الإجابة</button>}
@@ -288,18 +310,18 @@ function QuizScreen({ state, update, viewIds, jump, pick, expired, finish, revie
 function HomeScreen({state,update,start,open,finish,storage,celebrate,wrongSet,history,startRun}: {state:Saved;update:(v:Partial<Saved>)=>void;start:()=>void;open:(filter:string)=>void;finish:()=>void;storage:string;celebrate:boolean;wrongSet:Set<number>;history:Attempt[];startRun:(r:Run)=>void}) {
  const {picked,ids,submitted,started,setup,elapsed} = state;
  const right=ids.filter(id=>picked[id]===questions[id].c).length;const wrong=ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c).length;const blank=ids.filter(id=>picked[id]===null).length;
- const bank=banks.find(b=>b.id===setup.section)||banks[0];const capacity=bank.ids.length;
- const filtered=banks;
+ const bank=banks.find(b=>b.id===setup.section)||banks[0];
+ const [bankQuery,setBankQuery]=useState('');
+ const filtered=bankQuery?banks.filter(b=>b.name.includes(bankQuery)):banks;
  const groups=Array.from(new Set(banks.map(b=>b.group)));
- const groupLabel=(g:string)=>{const n=banks.filter(b=>b.group===g).length;return (g==='tests'?'الاختبارات':g)+' · '+toAr(String(n));};
  const confetti=React.useMemo(()=>Array.from({length:26},(_,i)=>({left:(i*37+13)%100,delay:(i%9)*0.14,duration:2.2+(i%5)*0.35,color:['#0b4f4a','#e4f5a4','#7fd08a','#ffffff','#c9ef6b'][i%5],size:6+(i%3)*3})),[]);
  return <div className="qz-home">
  {celebrate&&state.settings.fx&&!state.settings.calm&&<div className="qz-confetti" aria-hidden="true">{confetti.map((p,i)=><i key={i} style={{left:`${p.left}%`,width:p.size,height:p.size*1.4,background:p.color,animationDelay:`${p.delay}s`,animationDuration:`${p.duration}s`}}/>)}</div>}
  <p className={"qz-home-title"+(!submitted&&!started?" qz-home-quiz":"")}>{submitted?'نتيجة التجربة':started?'كمّل من مكانك':bank.name}</p>
  <p className="qz-save-status" role="status">{storage}</p>{started&&<p className="qz-set-detail">{state.run==='notebook'||state.run==='flagged'?runLabel(state.run):(banks.find(b=>b.ids.includes(ids[0]))||bank).name}</p>}
- {submitted?<>{celebrate&&<p className="qz-bravo" role="status">برافو! نتيجة عالية 🎉</p>}<div className="qz-score"><strong><bdi>{toAr(String(Math.round(right/ids.length*100)))}٪</bdi></strong><span>{toAr(String(right))} صح من {toAr(String(ids.length))}</span></div><div className="qz-result-grid">{[[right,'صح'],[wrong,'غلط'],[blank,'بدون إجابة']].map(([n,l])=><div key={l}><b>{toAr(String(n))}</b><span>{l}</span></div>)}</div><p className="qz-home-time"><ClockIcon/> وقت الحل: <bdi>{formatTime(state.resultElapsed??elapsed)}</bdi></p><p className="qz-set-detail">الأسئلة المتروكة محسوبة في الدرجة.</p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>مراجعة كل الإجابات</button><button type="button" className="qz-btn ghost" onClick={()=>open('wrong')}>مراجعة الغلط فقط ({toAr(String(wrong))})</button></div></>:started?<><p className="qz-home-sub">جاوبت {toAr(String(ids.length-blank))} من {toAr(String(ids.length))} · {state.mode==='exam'?'امتحان':'مذاكرة'}</p><details className="qz-session-map"><summary>خريطة الأسئلة</summary><div className="qz-home-cards">{ids.map(id=><button type="button" className="qz-home-card" key={id} onClick={()=>{open('all');update({index:id});}}><span className="qz-home-card-num">سؤال {toAr(String(ids.indexOf(id)+1))}</span><span className="qz-home-card-state">{picked[id]===null?'لسه':state.mode==='exam'?'تم الاختيار':picked[id]===questions[id].c?'صح ✓':'غلط ✕'}</span></button>)}</div></details><p className="qz-home-time"><ClockIcon/><bdi>{formatTime(elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>كمّل الحل</button><button type="button" className="qz-btn ghost" onClick={finish}>إنهاء وعرض النتيجة</button></div></>:null}
+ {submitted?<>{celebrate&&<p className="qz-bravo" role="status">برافو! نتيجة عالية 🎉</p>}<div className="qz-score"><strong><bdi>{toAr(String(Math.round(right/ids.length*100)))}٪</bdi></strong><span>{toAr(String(right))} صح من {toAr(String(ids.length))}</span></div><div className="qz-result-grid">{[[right,'صح'],[wrong,'غلط'],[blank,'بدون إجابة']].map(([n,l])=><div key={l}><b>{toAr(String(n))}</b><span>{l}</span></div>)}</div><p className="qz-home-time"><ClockIcon/> وقت الحل: <bdi>{formatTime(state.resultElapsed??elapsed)}</bdi></p><p className="qz-set-detail">الأسئلة المتروكة محسوبة في الدرجة.</p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>مراجعة كل الإجابات</button><button type="button" className="qz-btn ghost" disabled={wrong===0} onClick={()=>open('wrong')}>مراجعة الغلط فقط ({toAr(String(wrong))})</button></div></>:started?<><p className="qz-home-sub">جاوبت {toAr(String(ids.length-blank))} من {toAr(String(ids.length))} · {state.mode==='exam'?'امتحان':'مذاكرة'}</p><details className="qz-session-map"><summary>خريطة الأسئلة</summary><div className="qz-home-cards">{ids.map(id=><button type="button" className="qz-home-card" key={id} onClick={()=>{open('all');update({index:id});}}><span className="qz-home-card-num">سؤال {toAr(String(ids.indexOf(id)+1))}</span><span className="qz-home-card-state">{picked[id]===null?'لسه':state.mode==='exam'?'تم الاختيار':picked[id]===questions[id].c?'صح ✓':'غلط ✕'}</span></button>)}</div></details><p className="qz-home-time"><ClockIcon/><bdi>{formatTime(elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={()=>open('all')}>كمّل الحل</button><button type="button" className="qz-btn ghost" onClick={finish}>إنهاء وعرض النتيجة</button></div></>:null}
  <details className="qz-set-group" open={!started}><summary>{started?'تجربة جديدة':'إعداد التجربة'}</summary><div className="qz-setup">
- <label className="qz-set-label">الاختبار أو البنك</label><select className="qz-bank-input" aria-label="اختيار الاختبار أو البنك" value={setup.section} onChange={e=>{const b=banks.find(b=>b.id===e.target.value)!;update({setup:{...setup,section:b.id,count:b.ids.length},settings:{...state.settings,minutes:b.minutes}});}}>{!filtered.some(b=>b.id===setup.section)&&<option value={setup.section}>{bank.name} · {toAr(String(capacity))}</option>}{groups.map(g=><optgroup key={g} label={groupLabel(g)}>{filtered.filter(b=>b.group===g).map(b=><option value={b.id} key={b.id}>{b.name} · {toAr(String(b.ids.length))} سؤال</option>)}</optgroup>)}</select>{filtered.length===0&&<p className="qz-set-detail">مفيش نتائج للبحث.</p>}
+ <label className="qz-set-label" htmlFor="bank-search">الاختبار أو البنك</label><input id="bank-search" className="qz-bank-input qz-bank-search" type="search" placeholder="ابحث عن بنك…" aria-label="ابحث عن بنك" value={bankQuery} onChange={e=>setBankQuery(e.target.value)}/><div className="qz-bank-list" role="listbox" aria-label="الاختبار أو البنك">{groups.map(g=>{const gb=filtered.filter(b=>b.group===g);if(!gb.length)return null;const totalQ=gb.reduce((a,b)=>a+b.ids.length,0);return <div key={g} className="qz-bank-group"><p className="qz-bank-group-label">{g==='tests'?'الاختبارات':g} · {toAr(String(totalQ))} سؤال</p>{gb.map(b=><button type="button" key={b.id} role="option" aria-selected={setup.section===b.id} className={'qz-bank-opt'+(setup.section===b.id?' is-on':'')} onClick={()=>update({setup:{section:b.id,mode:setup.mode},settings:{...state.settings,minutes:b.minutes}})}>{b.name} · {toAr(String(b.ids.length))} سؤال</button>)}</div>;})}{filtered.length===0&&<p className="qz-set-detail">مفيش نتائج للبحث.</p>}</div>
 
  <span className="qz-set-label">طريقة التجربة</span><div className="qz-set-seg">{[['study','مذاكرة'],['exam','امتحان']].map(([v,l])=><button type="button" className={'qz-set-seg-btn'+(setup.mode===v?' is-on':'')} key={v} aria-pressed={setup.mode===v} onClick={()=>update({setup:{...setup,mode:v as Mode}})}>{l}</button>)}</div><p className="qz-set-detail">{setup.mode==='study'?'تصحيح فوري، مع التلميح والشرح حسب إعداداتك.':'من غير تلميحات أو تصحيح أو شرح لحد التسليم. تقدر تغيّر إجابتك قبل النهاية.'}</p><button type="button" className="qz-btn primary qz-home-cta" onClick={start}>ابدأ تجربة {setup.mode==='study'?'مذاكرة':'امتحان'}</button></div></details>
  <LearnPanels wrongSet={wrongSet} flagged={state.favorites} history={history} startRun={startRun} mode={setup.mode}/>
@@ -310,31 +332,14 @@ function HomeScreen({state,update,start,open,finish,storage,celebrate,wrongSet,h
 
 
 const infoConfirmed = ['الامتحان 100 سؤال اختيار من متعدد، وزمنه لا يتجاوز 3 ساعات.','النتيجة نجاح أو رسوب (Pass or Fail) من غير درجات.','الدخول من لابتوب أو كمبيوتر فيه كاميرا (USB)، والكاميرا تشتغل طول الامتحان.','ارفع صورة شخصية بخلفية بيضاء قبل أي امتحان، وإلا ممكن يتلغي الامتحان أو يتعلّق البروفايل.','اقعد لوحدك في مكان هادي ومنعزل وبشكل لائق طول الامتحان.','ادخل الموقع قبل الميعاد بـ20 دقيقة على الأقل.','ممنوع فتح أي متصفح أو موقع تاني، أو استخدام أجهزة تانية أو سماعات خارجية، والمخالفة بتلغي الامتحان.','في كل دور 3 امتحانات فعلية، تنجح في أي واحد منهم، والمحسوب آخر امتحان تدخله. لو نجحت من أول مرة الأفضل ما تدخلش تاني.'];
-const infoUnconfirmed = ['توزيع الأسئلة: 40 جراحة وباطنة وحالات حرجة، 25 نساء وتوليد، 25 أطفال، 10 إدارة تمريض.','نسبة النجاح 60٪.','الدرجات متعلقة بالمستوى العام للكلية والترتيب (Rank) بين الكليات، مش بمكان التعيين.','الموبايل أو التابلت غير مقبول في أي امتحان (تجريبي أو محاكاة أو فعلي)، والموبايل يتستخدم بس في تسجيل البيانات على الموقع.','تأكد إن الإيميل وكلمة السر اللي سجلتهم صح وشغالين، لأنهم نفس البيانات المبعوتة للمجلس.'];
-const payNotes = ['الدفع بالرقم القومي (كود الدفع)، ورسوم المصريين وقتها كانت 200 جنيه.','لو ما دفعتش في الميعاد ما تقدرش تدخل الامتحان ولا تسجّل على الموقع.','رسوم كل دور منفصلة، ولو دفعت في دور تلتزم بالامتحان في نفس الدور.','اتأكد من الرقم القومي وكود الدفع والاسم اللي بيظهر وقت الدفع.','اتأكد إن المدفوعة باسم المجلس الصحي المصري، واحتفظ بإيصال الدفع لحد ما تظهر النتيجة.','الدفع من تطبيق على موبايلك لازم يكون لنفس الشخص، ومينفعش من بروفايل شخص تاني.'];
+// S4-3: the unconfirmed stats (60٪ pass rate, question split) and the stale July 2024 payment panel are
+// removed entirely — no verification wording or unconfirmed numbers in the UI.
 function InfoPanels() {
     return <>
         <details className="qz-set-group" open><summary>تعليمات الامتحان الفعلي <span>للطلاب</span></summary>
             <div className="qz-set-row qz-stacked">
                 <p className="qz-set-detail">دي تعليمات امتحان المزاولة الحقيقي، مش قواعد الكويز ده.</p>
-                <span className="qz-set-label">متأكد منها (من موقع المجلس الصحي المصري)</span>
                 <ul className="qz-info-list">{infoConfirmed.map(t=><li key={t}>{t}</li>)}</ul>
-                <TextLink href="https://ims.ehc.gov.eg/ar/profession-practise-exam-for-nursing-and-midwifery-professions">صفحة الاختبار على موقع المجلس</TextLink>
-            </div>
-            <div className="qz-set-row qz-stacked">
-                <span className="qz-set-label">من منشور متداول، ما لقيناهاش في صفحة المجلس</span>
-                <p className="qz-set-detail">راجعها مع كليتك أو المجلس قبل ما تعتمد عليها.</p>
-                <ul className="qz-info-list">{infoUnconfirmed.map(t=><li key={t}>{t}</li>)}</ul>
-            </div>
-        </details>
-        <details className="qz-set-group"><summary>سداد الرسوم <span>إشعار قديم</span></summary>
-            <div className="qz-set-row qz-stacked">
-                <p className="qz-set-detail"><b>ده إشعار قديم من يوليو 2024.</b> المواعيد والرسوم فيه خاصة بالدور ده، مش بالدور الحالي. اسأل كليتك أو المجلس عن ميعاد ورسوم دورك.</p>
-                <span className="qz-set-label">الخطوات وقتها</span>
-                <ol className="qz-info-list"><li>خدمات أو مدفوعات حكومية.</li><li>المجلس الصحي المصري.</li><li>اكتب الرقم القومي (كود الدفع).</li></ol>
-                <p className="qz-set-detail">الدفع كان من 1 إلى 14 يوليو 2024، عن طريق شركات التحصيل (أمان، أموال، طلقة، سمارت باي، بساطة، جيديا) أو تطبيقات دفع.</p>
-                <span className="qz-set-label">تعليمات ما زالت مفيدة</span>
-                <ul className="qz-info-list">{payNotes.map(t=><li key={t}>{t}</li>)}</ul>
             </div>
         </details>
     </>;
@@ -477,18 +482,30 @@ function MockApp() {
     const [celebrate,setCelebrate] = useState(false);
     const [burst,setBurst] = useState(0);
     const burstPieces=React.useMemo(()=>Array.from({length:26},(_,i)=>({left:(i*37+13)%100,delay:(i%9)*0.06,duration:1.6+(i%5)*0.25,color:['#0b4f4a','#e4f5a4','#7fd08a','#ffffff','#c9ef6b'][i%5],size:6+(i%3)*3})),[]);
-    const panel=useRef<HTMLDialogElement>(null);const scroller=useRef<HTMLDivElement>(null);const resultSeen=useRef(false);
-    const remaining=Math.max(0,settings.minutes*60-elapsed);const expired=settings.countdown&&remaining===0;
+    const panel=useRef<HTMLDialogElement>(null);const scroller=useRef<HTMLDivElement>(null);
+    const [attemptKey,setAttemptKey]=useState(0);
+    // S2-5: the clock ticks every second on screen, but localStorage is written at most every 10s (pause/answer/submit flush it).
+    const elapsedRef=useRef(elapsed);
+    const [liveElapsed,setLiveElapsed]=useState(elapsed);
+    useEffect(()=>{ elapsedRef.current=elapsed; setLiveElapsed(elapsed); },[elapsed]);
+    const remaining=Math.max(0,settings.minutes*60-liveElapsed);const expired=settings.countdown&&remaining===0;
     const allAnswered=ids.every(id=>picked[id]!==null);
     const viewIds=review==='wrong'?ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c):ids;
     const safeIndex=viewIds.includes(index)?index:(viewIds[0]??index);
     useEffect(()=>{setMasterVolume(settings.volume??80);},[settings.volume]);
     useEffect(()=>{if(opened)panel.current?.showModal();else panel.current?.close();},[opened]);
     useEffect(()=>{scroller.current?.scrollTo({top:0});setAutoPending(false);},[tab,index,review,confirmAction]);
+    const ticking=ready&&started&&!submitted&&!(allAnswered&&state.mode==='study')&&!paused&&!expired&&opened&&!(settings.quizOnly&&tab!=='quiz');
     useEffect(()=>{
-        if(!ready||!started||submitted||(allAnswered&&state.mode==='study')||paused||expired||!opened||(settings.quizOnly&&tab!=='quiz'))return;
-        const t=window.setInterval(()=>setState(prev=>({...prev,elapsed:prev.elapsed+1})),1000);return()=>window.clearInterval(t);
-    },[ready,started,submitted,allAnswered,paused,expired,opened,settings.quizOnly,tab,state.mode]);
+        if(!ticking)return;
+        const t=window.setInterval(()=>{
+            const next=elapsedRef.current+1;
+            elapsedRef.current=next;
+            setLiveElapsed(next);
+            if(next%10===0)setState(prev=>({...prev,elapsed:next}));
+        },1000);
+        return()=>window.clearInterval(t);
+    },[ticking]);
     const addWrong=(add:number[],drop:number[])=>{ if(!ready||(!add.length&&!drop.length))return; setExtra(prev=>{const set=unpackBits(prev.w);add.forEach(i=>set.add(i));drop.forEach(i=>set.delete(i));return {...prev,w:packBits(set),h:Array.isArray(prev.h)?prev.h:[]};}); };
     const pick=(v:number)=>{
         if(expired||submitted||!started||(state.mode==='study'&&picked[index]!==null&&!(settings.retry&&picked[index]!==questions[index].c)))return;
@@ -510,14 +527,15 @@ function MockApp() {
         if(ready){
             const wr=ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c);
             const ok=state.run==='notebook'?ids.filter(id=>picked[id]===questions[id].c):[];
-            const entry:Attempt={t:Date.now(),b:state.run==='notebook'||state.run==='flagged'?state.run:(state.bank??state.setup.section),m:state.mode,r:right,n:ids.length,s:elapsed};
+            const entry:Attempt={t:Date.now(),b:state.run==='notebook'||state.run==='flagged'?state.run:(state.bank??state.setup.section),m:state.mode,r:right,n:ids.length,s:liveElapsed};
             setExtra(prev=>{const set=unpackBits(prev.w);wr.forEach(i=>set.add(i));ok.forEach(i=>set.delete(i));const h=[...(Array.isArray(prev.h)?prev.h:[]),entry].slice(-HISTORY_MAX);return {w:packBits(set),h};});
         }
-        update({submitted:true,resultElapsed:elapsed,tab:'home'});setReview('all');
+        update({submitted:true,resultElapsed:liveElapsed,elapsed:liveElapsed,tab:'home'});setReview('all');
     };
-    const begin=(run?:Run)=>{const setup=state.setup;const nextIds=run?run.ids:(banks.find(b=>b.id===setup.section)||banks[0]).ids;if(!nextIds.length)return;setReview('all');setCelebrate(false);update({run:run?run.kind:'all',bank:run?run.kind:setup.section,ids:nextIds,picked:questions.map(()=>null),index:nextIds[0],elapsed:0,paused:false,started:true,submitted:false,resultElapsed:null,mode:setup.mode,tab:'quiz'});setConfirmAction(null);};
-    const finish=()=>{if(ids.some(id=>picked[id]===null))setConfirmAction('finish');else doSubmit();};
-    const reset=()=>{setReview('all');setCelebrate(false);update({started:false,submitted:false,resultElapsed:null,picked:questions.map(()=>null),elapsed:0,index:0,paused:false,tab:'home'});};
+    const begin=(run?:Run)=>{const setup=state.setup;const nextIds=run?run.ids:(banks.find(b=>b.id===setup.section)||banks[0]).ids;if(!nextIds.length)return;setReview('all');setCelebrate(false);setAttemptKey(k=>k+1);update({run:run?run.kind:'all',bank:run?run.kind:setup.section,ids:nextIds,picked:questions.map(()=>null),index:nextIds[0],elapsed:0,paused:false,started:true,submitted:false,resultElapsed:null,mode:setup.mode,tab:'quiz'});setConfirmAction(null);};
+    // Phase 1: always ask before finishing — even with no blank questions — so a stray tap cannot end the attempt.
+    const finish=()=>{setConfirmAction('finish');};
+    const reset=()=>{setReview('all');setCelebrate(false);setAttemptKey(k=>k+1);update({started:false,submitted:false,resultElapsed:null,picked:questions.map(()=>null),elapsed:0,index:0,paused:false,tab:'home'});};
     const warnFired=useRef<{m5:boolean;m1:boolean}>({m5:false,m1:false});
     useEffect(()=>{if(elapsed===0)warnFired.current={m5:false,m1:false};},[elapsed]);
     useEffect(()=>{
@@ -525,9 +543,8 @@ function MockApp() {
         if(remaining===60&&!warnFired.current.m1){warnFired.current={...warnFired.current,m1:true};}
         if(remaining===300&&settings.minutes*60>300&&!warnFired.current.m5){warnFired.current={...warnFired.current,m5:true};}
     },[remaining,settings.sounds,settings.countdown,settings.minutes,started,submitted,paused]);
-    useEffect(()=>{if(started&&submitted&&tab==='home')resultSeen.current=true;},[started,submitted,tab]);
-    const freshHome=()=>{resultSeen.current=false;reset();};
-    const goHome=()=>{setConfirmAction(null);if(submitted&&resultSeen.current)freshHome();else update({tab:'home'});};
+    // S3-1: leaving the result screen must not wipe it; a new attempt only starts when the user explicitly begins one.
+    const goHome=()=>{setConfirmAction(null);update({tab:'home'});};
     const open=(filter:string)=>{setReview(filter);const list=filter==='wrong'?ids.filter(id=>picked[id]!==null&&picked[id]!==questions[id].c):ids;update({tab:'quiz',index:list.includes(index)?index:(list[0]??index)});};
         const makeBackup = async (): Promise<string> => {
         const json = JSON.stringify({v:1,s:stored,x:extra});
@@ -555,16 +572,17 @@ function MockApp() {
             return 'اتسترجع التقدم.';
         } catch { return 'الكود مش صحيح أو ناقص.'; }
     };
-    const storage = (saved.status==='saved'||saved.status==='saving')&&(savedX.status==='saved'||savedX.status==='saving')?'الحفظ مفعّل على هذا المتصفح.':'الحفظ للجلسة الحالية فقط.';
+    // S2-6: the reassurance only shows when both stores actually report saved; a write failure shows an honest warning.
+    const storage = saved.status==='error'||savedX.status==='error' ? 'تنبيه: الحفظ مش شغال في المتصفح ده — تقدمك هيضيع لو قفلت الصفحة. جرّب متصفح تاني أو افضي مساحة.' : 'الحفظ مفعّل على هذا المتصفح.';
     const storageFull = storage+(legacyInfo.active?' لقينا تقدم محفوظ من نسخة قديمة (٣١٢٢ سؤال). مش بنحوّله لأن ترتيب الأسئلة القديم مش متاح هنا، فالتجربة بدأت من جديد. بياناتك القديمة محفوظة زي ما هي، وتقدر تصدّرها من الإعدادات ثم نسخة احتياطية.':'');
     const screenCls = `qz-screen qz-size-${settings.textSize}${settings.dark?' qz-dark':''}${settings.textSize==='large'?' qz-large':''}${settings.calm?' qz-calm':''}${settings.fx?' qz-fx':''}${settings.spacious?' qz-spacious':''}${settings.contrast?' qz-contrast':''}`;
 
     return (
         <>
-        <div className="qz-launch" hidden={opened} dir="rtl"><h2><QuizBrand/></h2><p>اختار الاختبار وكمّل من مكانك.</p><button type="button" className="qz-btn primary" onClick={() => {if(submitted&&resultSeen.current)freshHome();setOpened(true);}}>افتح التجربة</button></div>
-        <dialog ref={panel} className="qz-app-dialog" onCancel={(e) => { if (e.target === e.currentTarget) setOpened(false); }} onClose={(e) => { if (e.target === e.currentTarget) setOpened(false); }} dir="rtl">
+        <div className="qz-launch" hidden={opened} dir="rtl"><h2><QuizBrand/></h2><p>اختار الاختبار وكمّل من مكانك.</p><button type="button" className="qz-btn primary" onClick={() => setOpened(true)}>افتح التجربة</button></div>
+        <dialog ref={panel} className="qz-app-dialog" onCancel={(e) => { if (e.target === e.currentTarget) { if (tab!=='home') { e.preventDefault(); goHome(); } else setOpened(false); } }} onClose={(e) => { if (e.target === e.currentTarget) setOpened(false); }} dir="rtl">
         <div className={screenCls+(tab==='quiz'&&started?' qz-is-solving':'')} style={{'--qz-scale':fontPercent(settings)/100} as React.CSSProperties} aria-label="Quiz Hub، أسئلة مزاولة المهنة">
-            <header className="qz-app-head"><QuizBrand compact={tab==='quiz'&&started}/>{tab==='quiz'&&started&&settings.timer&&<TimerChip elapsed={settings.countdown?remaining:elapsed} countdown={settings.countdown}/>}<CloseButton label="قفل التجربة" onClick={() => setOpened(false)} /></header>
+            <header className="qz-app-head"><QuizBrand compact={tab==='quiz'&&started}/>{tab==='quiz'&&started&&settings.timer&&<TimerChip elapsed={settings.countdown?remaining:liveElapsed} countdown={settings.countdown}/>}<CloseButton label="قفل التجربة" onClick={() => { if (tab!=='home') goHome(); else setOpened(false); }} /></header>
             {burst>0&&<div className="qz-confetti" key={burst} aria-hidden="true" data-testid="burst">{burstPieces.map((p,i)=><i key={i} style={{left:`${p.left}%`,width:p.size,height:p.size*1.4,background:p.color,animationDelay:`${p.delay}s`,animationDuration:`${p.duration}s`}}/>)}</div>}
             <div className="qz-scroll" ref={scroller}>
             {!(tab==='quiz'&&started)&&<div className="qz-topbar">
@@ -572,11 +590,11 @@ function MockApp() {
                 
             </div>}
 
-            {!ready?<p role="status">جاري تجهيز التجربة المحفوظة…</p>:<>
+            {<>
             {(paused||(allAnswered&&state.mode==='study')||expired||submitted)&&started&&<p className="qz-clock-status">{expired?'الوقت خلص':submitted?'تم التسليم، العداد متوقف':allAnswered?'اكتملت الاختيارات، العداد متوقف':'العداد متوقف مؤقتًا'}</p>}
-            {confirmAction&&<div className="qz-hint qz-confirm-box" role="alert"><p>{confirmAction==='finish'?'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟':'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p><div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={()=>{if(confirmAction==='start')begin(pendingRun??undefined);else{doSubmit();setConfirmAction(null);}}}>{confirmAction==='start'?'ابدأ من جديد':'سلّم التجربة'}</button><button type="button" className="qz-btn ghost" onClick={()=>setConfirmAction(null)}>رجوع</button></div></div>}
-            {tab==='home'&&<HomeScreen state={state} update={update} start={()=>{setPendingRun(null);if(started)setConfirmAction('start');else begin();}} open={open} finish={finish} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r=>{if(started){setPendingRun(r);setConfirmAction('start');}else begin(r);}}/>}
-            {tab==='quiz'&&started&&<QuizScreen state={{...state,index:safeIndex}} update={update} viewIds={viewIds} jump={id=>update({index:id})} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome}/>}
+            {confirmAction&&<div className="qz-hint qz-confirm-box" role="alert"><p>{confirmAction==='finish'?(ids.some(id=>picked[id]===null)?'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟':'كل الأسئلة مجاوبة. تسلّم دلوقتي وتعرض النتيجة؟'):'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p><div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={()=>{if(confirmAction==='start')begin(pendingRun??undefined);else{doSubmit();setConfirmAction(null);}}}>{confirmAction==='start'?'ابدأ من جديد':'سلّم التجربة'}</button><button type="button" className="qz-btn ghost" onClick={()=>setConfirmAction(null)}>رجوع</button></div></div>}
+            {tab==='home'&&<HomeScreen state={{...state,elapsed:liveElapsed}} update={update} start={()=>{setPendingRun(null);if(started)setConfirmAction('start');else begin();}} open={open} finish={finish} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r=>{if(started){setPendingRun(r);setConfirmAction('start');}else begin(r);}}/>}
+            {tab==='quiz'&&started&&<QuizScreen state={{...state,index:safeIndex}} update={update} viewIds={viewIds} jump={id=>update({index:id})} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome} attemptKey={attemptKey}/>}
             {tab==='quiz'&&!started&&<div className="qz-home"><p>اختار طريقة التجربة من الرئيسية الأول.</p><button type="button" className="qz-btn primary" onClick={()=>update({tab:'home'})}>إعداد التجربة</button></div>}
             {tab==='settings'&&<SettingsScreen backup={{make:makeBackup,restore:restoreBackup}} settings={settings} setSettings={v=>update({settings:v})} onReset={reset} paused={paused} setPaused={v=>update({paused:v})} resetClock={()=>update({elapsed:0})}/>}
             </>}

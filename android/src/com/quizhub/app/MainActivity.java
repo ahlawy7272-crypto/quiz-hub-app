@@ -45,18 +45,26 @@ public class MainActivity extends Activity {
     /** Clear Arabic error view for unreadable question files; marks the failure so no quiz is rendered over it. */
     void showBankError(Exception e) {
         bankLoadFailed = true;
+        android.util.Log.e("QuizHub", "bank load failed", e);
         android.widget.TextView tv = new android.widget.TextView(this);
-        tv.setText("ملفات الأسئلة جوه التطبيق مش سليمة، فمقدرش أفتحها. نزّل نسخة التطبيق تاني وثبّتها فوق الموجودة. تقدمك محفوظ.\n\n" + e);
+        tv.setText("ملفات الأسئلة جوه التطبيق مش سليمة، فمقدرش أفتحها. نزّل نسخة التطبيق تاني وثبّتها فوق الموجودة. تقدمك محفوظ.");
         tv.setPadding(48, 96, 48, 48); tv.setTextSize(16); tv.setTextDirection(View.TEXT_DIRECTION_RTL);
         setContentView(tv);
     }
 
     String review = "all";        // all | wrong
     String confirmAction = null;  // finish | start | null
-    boolean resultSeen = false;
     Boolean setupOpen = null;     // null = auto (!started), like web <details open={!started}>
     boolean trOpen=false, hintOpen=false;
     Integer pending = null;
+    /** S2-1: a pending (unconfirmed) choice kept per question position, so navigating away and back does not lose it. */
+    java.util.HashMap<Integer,Integer> pendingByQuestion = new java.util.HashMap<>();
+    /** S3-2: only scroll to top when the view identity actually changed (tab/question/review/confirm), not on every settings toggle. */
+    String lastScrollSig = "";
+    /** S3-10: info panels collapsed state (exam panel open by default). */
+    boolean infoExamOpen = true;
+    /** S4-5: current search text in the in-page bank picker. */
+    String bankQuery = "";
 
     List<Bank.Question> qs;       // current session bank questions (session order)
     Bank.BankMeta currentBank;
@@ -73,13 +81,14 @@ public class MainActivity extends Activity {
             return;
         }
         s = Session.load(this, bank);
+        restoreTransient(b);
         theme.dark = s.dark;
         theme.scale = s.fontPercent / 100f;
 
         applyFrame();
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(0xffffffff);
+        root.setBackgroundColor(theme.dark ? Theme.D_BG : 0xffffffff);
         setContentView(root);
         buildScreen();
         renderAll();
@@ -87,13 +96,58 @@ public class MainActivity extends Activity {
         if (s.notice != null) { android.widget.Toast.makeText(this, s.notice, android.widget.Toast.LENGTH_LONG).show(); s.notice = null; save(); }
     }
 
-    /** White frame around the rounded card (web .qz-app-dialog::backdrop is white), dark system icons. */
+    /** S3-3: rotation / process recreation keeps transient UI state that is not in Session (pending answers, open panels/dialogs). */
+    @Override protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putInt("pending", pending == null ? -1 : pending);
+        int n = pendingByQuestion.size();
+        int[] pk = new int[n], pv = new int[n]; int i = 0;
+        for (java.util.Map.Entry<Integer,Integer> e : pendingByQuestion.entrySet()) { pk[i] = e.getKey(); pv[i] = e.getValue(); i++; }
+        out.putIntArray("pendingKeys", pk);
+        out.putIntArray("pendingVals", pv);
+        out.putBoolean("trOpen", trOpen);
+        out.putBoolean("hintOpen", hintOpen);
+        out.putString("review", review);
+        out.putString("confirmAction", confirmAction);
+        out.putBoolean("setupOpenSet", setupOpen != null);
+        out.putBoolean("setupOpen", setupOpen != null && setupOpen);
+        out.putBoolean("infoExamOpen", infoExamOpen);
+        out.putString("pendingRunKind", pendingRunKind);
+        out.putIntArray("pendingRunIds", pendingRunIds);
+        out.putString("bankQuery", bankQuery);
+    }
+
+    void restoreTransient(Bundle b) {
+        if (b == null) return;
+        int p = b.getInt("pending", -1);
+        pending = p < 0 ? null : p;
+        int[] pk = b.getIntArray("pendingKeys"), pv = b.getIntArray("pendingVals");
+        if (pk != null && pv != null && pk.length == pv.length)
+            for (int i = 0; i < pk.length; i++) pendingByQuestion.put(pk[i], pv[i]);
+        trOpen = b.getBoolean("trOpen", trOpen);
+        hintOpen = b.getBoolean("hintOpen", hintOpen);
+        review = b.getString("review", review);
+        confirmAction = b.getString("confirmAction");
+        if (b.getBoolean("setupOpenSet", false)) setupOpen = b.getBoolean("setupOpen", true);
+        infoExamOpen = b.getBoolean("infoExamOpen", true);
+        pendingRunKind = b.getString("pendingRunKind");
+        pendingRunIds = b.getIntArray("pendingRunIds");
+        bankQuery = b.getString("bankQuery", "");
+    }
+
+    /** S4-8: dark system bars in dark mode instead of a white frame around a dark app. */
     void applyFrame() {
-        getWindow().setStatusBarColor(0xffffffff);
-        getWindow().setNavigationBarColor(0xffffffff);
-        int f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        if (android.os.Build.VERSION.SDK_INT >= 26) f |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-        getWindow().getDecorView().setSystemUiVisibility(f);
+        if (theme.dark) {
+            getWindow().setStatusBarColor(0xff092f2c);
+            getWindow().setNavigationBarColor(0xff092f2c);
+            getWindow().getDecorView().setSystemUiVisibility(0);
+        } else {
+            getWindow().setStatusBarColor(0xffffffff);
+            getWindow().setNavigationBarColor(0xffffffff);
+            int f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (android.os.Build.VERSION.SDK_INT >= 26) f |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(f);
+        }
     }
 
     // ---------------- shell ----------------
@@ -279,7 +333,9 @@ public class MainActivity extends Activity {
     String pendingRunKind = null; int[] pendingRunIds = null;
     void ensureQs() {
         if (qs != null || bankLoadFailed) return;
-        if (!s.run.equals("all")) qs = bank.forIds(s.ids); else loadBank(sessionBank());
+        // S1-2: a corrupt bank file must show the error view, not crash out of the render.
+        if (!s.run.equals("all")) { try { qs = bank.forIds(s.ids); } catch (Exception e) { showBankError(e); } }
+        else loadBank(sessionBank());
     }
     void startRun(String kind, int[] ids) {
         if (ids.length == 0) return;
@@ -318,21 +374,24 @@ public class MainActivity extends Activity {
             s.setupSection = b.id;
         }
         if (pendingRunKind != null) {
-            s.run = pendingRunKind; s.bankKey = pendingRunKind; s.ids = pendingRunIds.clone();
+            // S1-1: bankKey stays a real bank id (the setup bank); the run kind lives in run only.
+            // Storing "notebook"/"flagged" in bankKey used to make sanitize() wipe the session on next launch.
+            s.run = pendingRunKind; s.bankKey = b.id; s.ids = pendingRunIds.clone();
             pendingRunKind = null; pendingRunIds = null;
-            qs = bank.forIds(s.ids);
+            try { qs = bank.forIds(s.ids); } catch (Exception e) { showBankError(e); return; }
         } else { s.run = "all"; s.bankKey = b.id; s.ids = b.ids.clone(); qs = null; }
         s.picked = new int[s.ids.length];
         java.util.Arrays.fill(s.picked, -1);
         s.index = 0; s.elapsed = 0; s.paused = false; s.started = true; s.submitted = false;
         s.resultElapsed = -1; s.mode = s.setupMode; s.tab = "quiz";
-        review = "all"; celebrate = false; confirmAction = null; resultSeen = false; setupOpen = null;
+        review = "all"; celebrate = false; confirmAction = null; setupOpen = null;
+        pending = null; pendingByQuestion.clear();
         if (qs == null) loadBank(b);
         save(); renderAll(); startTicker();
     }
+    /** Phase 1: always ask before finishing — even with no blank questions — so a stray tap cannot end the attempt. */
     void finishQuiz() {
-        if (s.blank() > 0) { confirmAction = "finish"; renderAll(); }
-        else { recordSubmit(); s.submitted = true; s.resultElapsed = s.elapsed; s.tab = "home"; review = "all"; save(); renderAll(); }
+        confirmAction = "finish"; renderAll();
     }
     void doFinishConfirmed() {
         recordSubmit(); s.submitted = true; s.resultElapsed = s.elapsed; s.tab = "home"; review = "all"; confirmAction = null;
@@ -340,17 +399,26 @@ public class MainActivity extends Activity {
     }
     void reset() {
         review = "all"; celebrate = false;
+        pending = null; pendingByQuestion.clear();
         s.started = false; s.submitted = false; s.resultElapsed = -1;
         s.picked = new int[s.ids.length]; java.util.Arrays.fill(s.picked, -1);
         s.elapsed = 0; s.index = 0; s.paused = false; s.tab = "home";
         setupOpen = null;
         save(); renderAll();
     }
-    void freshHome() { resultSeen = false; reset(); }
+    /** S3-1: leaving the result screen must not wipe it; a new attempt only starts when the user explicitly begins one (setup "ابدأ تجربة" -> begin()). */
     void goHome() {
         confirmAction = null;
-        if (s.submitted && resultSeen) freshHome();
-        else { s.tab = "home"; save(); renderAll(); }
+        s.tab = "home"; save(); renderAll();
+    }
+    /** S3-6: restore the progress that was live before the last backup restore. */
+    void undoLastRestore() {
+        if (!Session.undoRestore(this)) { android.widget.Toast.makeText(this, "مفيش استرجاع سابق للتراجع عنه.", android.widget.Toast.LENGTH_SHORT).show(); return; }
+        s = Session.load(this, bank);
+        theme.dark = s.dark; theme.scale = s.fontPercent / 100f;
+        qs = null; review = "all"; confirmAction = null; pending = null; pendingByQuestion.clear();
+        buildScreen(); renderAll();
+        android.widget.Toast.makeText(this, "رجعنا التقدم اللي قبل الاسترجاع.", android.widget.Toast.LENGTH_LONG).show();
     }
     void openReview(String filter) {
         review = filter;
@@ -389,11 +457,14 @@ public class MainActivity extends Activity {
     void commit(int v) {
         pick(v);
         pending = null;
+        pendingByQuestion.remove(s.index);
         if (s.autoExplain && s.mode.equals("study") && !s.submitted) Screens.showExplain(this);
     }
 
     void trReset() {
-        trOpen = s.translation; hintOpen = s.hintDefault; pending = null;
+        trOpen = s.translation; hintOpen = s.hintDefault;
+        // S2-1: a pending (unconfirmed) choice is kept per question instead of being thrown away on every navigation.
+        pending = pendingByQuestion.get(s.index);
     }
 
     void loadBank(Bank.BankMeta b) {
@@ -415,22 +486,25 @@ public class MainActivity extends Activity {
     void renderAll() {
         if (bankLoadFailed) return;
         theme.dark = s.dark; theme.scale = s.fontPercent / 100f;
-        root.setBackgroundColor(0xffffffff);
+        root.setBackgroundColor(theme.dark ? Theme.D_BG : 0xffffffff);
         screen.setBackground(Ui.round(theme.bg(), Ui.dp(this, 28)));
         applyFrame();
         tabbarBg.applyTheme();
         refreshHeader();
         refreshTabbar();
-        scroll.scrollTo(0, 0);
+        // S3-2: a settings toggle re-renders the same view, so it must not jump to the top.
+        String scrollSig = s.tab + "|" + s.index + "|" + review + "|" + confirmAction;
+        if (!scrollSig.equals(lastScrollSig)) { lastScrollSig = scrollSig; scroll.scrollTo(0, 0); }
         content.removeAllViews();
         if (s.started) ensureQs();
+        if (bankLoadFailed) return;
         if (s.tab.equals("home")) Screens.home(this, content);
         else if (s.tab.equals("quiz")) {
             if (s.started) Screens.quiz(this, content);
             else Screens.quizEmpty(this, content);
         }
         else Screens.settings(this, content);
-        String sig = s.tab + "|" + s.index + "|" + s.submitted + "|" + (s.started ? 1 : 0) + "|" + review + "|" + resultSeen + "|" + confirmAction;
+        String sig = s.tab + "|" + s.index + "|" + s.submitted + "|" + (s.started ? 1 : 0) + "|" + review + "|" + confirmAction;
         if (!sig.equals(lastSig)) { boolean first = lastSig.isEmpty(); lastSig = sig; if (!first) Fx.rise(this, content); }
     }
 

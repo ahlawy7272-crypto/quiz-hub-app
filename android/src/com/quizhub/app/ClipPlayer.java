@@ -40,18 +40,31 @@ public final class ClipPlayer {
     public static String lastError = "";
     public static int fdFallbacks = 0;
 
-    /** Shows what actually failed (exception / MediaPlayer error codes) plus the facts that matter, instead of staying silent. */
+    /** Shows a plain-Arabic failure toast (the technical detail goes to logcat only, S4-9). */
     static void fail(Context c, String why) {
         lastError = why;
-        String vol = "";
+        android.util.Log.e("QuizHub", "audio failed: " + why + " fd-fallbacks=" + fdFallbacks);
         try {
-            android.media.AudioManager am = (android.media.AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
-            vol = "\nmedia volume " + am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC) + "/" + am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
-        } catch (Exception ignore) {}
-        try {
-            android.widget.Toast.makeText(c.getApplicationContext(), "تعذر تشغيل الصوت\n" + why + vol + "\nfd-fallbacks " + fdFallbacks,
+            android.widget.Toast.makeText(c.getApplicationContext(), "تعذّر تشغيل الصوت، جرّب تاني.",
                 android.widget.Toast.LENGTH_LONG).show();
         } catch (Exception ignore) {}
+    }
+
+    private static android.media.AudioManager.OnAudioFocusChangeListener focusListener = focusChange -> {
+        // a call or notification takes focus: stop the explanation instead of talking over it
+        if (focusChange == android.media.AudioManager.AUDIOFOCUS_LOSS
+                || focusChange == android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) stop();
+    };
+    private static android.media.AudioManager lastAm;
+    private static boolean requestFocus(Context c) {
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return true;
+            lastAm = am;
+            int r = am.requestAudioFocus(focusListener, android.media.AudioManager.STREAM_MUSIC,
+                    android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+            return r == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        } catch (Exception e) { return true; }
     }
 
     public static boolean exists(Context c, String name) {
@@ -91,22 +104,27 @@ public final class ClipPlayer {
         return (mp != null || fakePlay) && name.equals(playing);
     }
 
-    /** Toggle: starts the clip, or stops it if it is already playing. Returns true if now playing. */
-    public static boolean toggle(Context c, String name, Runnable onDone) {
+    /** Toggle: starts the clip, or stops it if it is already playing. Returns true if now playing.
+     *  volume is 0-100 and now drives the explanation clip too (S2-2). Preparation is async
+     *  (S2-4) so a slow clip never freezes the UI thread. */
+    public static boolean toggle(Context c, String name, int volume, Runnable onDone) {
         lastError = "";
         if (isPlaying(name)) { stop(); return false; }
         stop();
         if (fakePlay) { playing = name; return true; }
+        if (!requestFocus(c)) { fail(c, "audio focus denied"); return false; }
         try {
             mp = new MediaPlayer();
             mp.setAudioAttributes(new android.media.AudioAttributes.Builder()
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
                 .setUsage(android.media.AudioAttributes.USAGE_MEDIA).build());
+            float v = Math.max(0f, Math.min(1f, volume / 100f));
+            mp.setVolume(v, v);
             load(c, mp, name);
             mp.setOnCompletionListener(m -> { stop(); if (onDone != null) onDone.run(); });
             mp.setOnErrorListener((m, w, x) -> { stop(); fail(c, "MediaPlayer error what=" + w + " extra=" + x + " [" + name + "]"); if (onDone != null) onDone.run(); return true; });
-            mp.prepare();
-            mp.start();
+            mp.setOnPreparedListener(m -> m.start());
+            mp.prepareAsync();
             playing = name;
             return true;
         } catch (Exception e) { stop(); fail(c, e.getClass().getSimpleName() + ": " + e.getMessage() + " [" + name + "]"); return false; }
@@ -118,6 +136,9 @@ public final class ClipPlayer {
             try { mp.release(); } catch (Exception ignore) {}
         }
         mp = null; playing = null;
+        if (lastAm != null) {
+            try { lastAm.abandonAudioFocus(focusListener); } catch (Exception ignore) {}
+        }
     }
 
     /** Short feedback sound (study mode only; callers enforce). volume 0-100. */
@@ -132,8 +153,8 @@ public final class ClipPlayer {
             m.setVolume(v, v);
             m.setOnCompletionListener(x -> x.release());
             m.setOnErrorListener((x, w, e) -> { x.release(); return true; });
-            m.prepare();
-            m.start();
-        } catch (Exception ignore) {}
+            m.setOnPreparedListener(x -> x.start());
+            m.prepareAsync(); // S2-4: never prepare on the main thread
+        } catch (Exception e) { lastError = "sfx: " + e.getMessage(); }
     }
 }

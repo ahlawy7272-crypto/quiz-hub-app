@@ -88,7 +88,7 @@ public final class Theme {
     public Typeface dispB()  { return readex700; }
 
     /** sp sizes already multiplied by --qz-scale where the CSS says calc(15px * scale). */
-    public float qSize()  { return 15f * scale; }
+    public float qSize()  { return 16f * scale; } // Phase 2: web parity (was 15)
     public float bodySize() { return 15f * scale; }
     public float smallSize(){ return 12f * scale; }
 }

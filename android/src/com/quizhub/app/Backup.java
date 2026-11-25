@@ -46,7 +46,7 @@ public final class Backup {
         if (sb == null) { sb = a.bank.banks.get(0); s.setupSection = sb.id; } // explicit default; the code stays self-consistent
         setup.put("section", sb.id); setup.put("count", sb.ids.length); setup.put("mode", s.setupMode);
         JSONObject o = new JSONObject();
-        o.put("run", s.run); o.put("bank", s.run.equals("all") ? s.bankKey : s.run);
+        o.put("run", s.run); o.put("bank", s.bankKey); // bankKey is always a real bank id (S1-1); the run kind lives in "run" only
         o.put("settings", st); o.put("favorites", new String(fav));
         o.put("ids", new JSONArray(toList(s.ids))); o.put("picked", new String(picked));
         o.put("index", s.ids.length > 0 ? s.ids[Math.min(s.index, s.ids.length - 1)] : 0);
@@ -121,7 +121,12 @@ public final class Backup {
             s.tab = "home";
             JSONObject su = st.optJSONObject("setup");
             if (su != null) { s.setupSection = su.optString("section", "6"); s.setupMode = su.optString("mode", "study"); }
-            a.qs = null; a.theme.dark = s.dark; a.theme.scale = s.fontPercent / 100f;
+            // S1-1: codes written during a notebook/flagged run store the run kind in "bank";
+            // point bankKey at the real setup bank so sanitize() never treats it as foreign.
+            if ((s.bankKey.equals("notebook") || s.bankKey.equals("flagged")) && s.bankKey.equals(s.run)) {
+                s.bankKey = a.bank.has(s.setupSection) ? s.setupSection : a.bank.banks.get(0).id;
+            }
+            a.qs = null; a.pending = null; a.pendingByQuestion.clear(); a.theme.dark = s.dark; a.theme.scale = s.fontPercent / 100f;
             a.save(); a.buildScreen(); a.renderAll();
             return "اتسترجع التقدم.";
         } catch (Exception e) { return "الكود مش صحيح أو ناقص."; }

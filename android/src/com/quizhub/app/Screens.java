@@ -65,7 +65,9 @@ final class Screens {
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        TextView mode = Ui.tv(a, s.submitted ? "نتيجة التجربة" : s.started ? "كمّل من مكانك" : "امتحان تجريبي", 20, t.dispB(), t.head());
+        // S4-12: the home title names the bank being set up, not a generic label.
+        Bank.BankMeta homeBank = bank.byId(s.setupSection);
+        TextView mode = Ui.tv(a, s.submitted ? "نتيجة التجربة" : s.started ? "كمّل من مكانك" : (homeBank != null ? homeBank.name : "امتحان تجريبي"), 20, t.dispB(), t.head());
         top.addView(mode, new LinearLayout.LayoutParams(0,-2,1f));
         if (s.timer && s.started) { LinearLayout.LayoutParams chp = new LinearLayout.LayoutParams(-2, -2); chp.setMarginStart(dp(a, 12)); top.addView(a.makeTimerChip(), chp); }
         c.addView(top);
@@ -77,13 +79,14 @@ final class Screens {
         }
         if (a.confirmAction != null) { confirmBox(a, c); }
 
-        TextView save = Ui.tv(a, "الحفظ مفعّل على هذا الجهاز.", 11.5f, t.dispB(), t.muted());
+        // S2-6: never claim "الحفظ مفعّل" without checking; the last save() records whether it actually wrote.
+        TextView save = Ui.tv(a, s.saveFailed ? "تنبيه: آخر حفظ فشل — جرب تقفل التطبيق وتفتحه تاني، أو افضي مساحة." : "الحفظ مفعّل على هذا الجهاز.", 11.5f, t.dispB(), s.saveFailed ? (t.dark ? Theme.D_MISSED : 0xffb3242b) : t.muted());
         add(c, save, 10);
 
         if (s.started) {
             a.ensureQs();
             add(c, detail(a, a.runLabel(s.run.equals("all") ? s.bankKey : s.run)), 6);
-            if (s.submitted) { a.resultSeen = true; resultCard(a, c); } // web: effect marks result seen once home shows it
+            if (s.submitted) { resultCard(a, c); }
             else inProgressCard(a, c);
         }
 
@@ -100,7 +103,7 @@ final class Screens {
         add(c, trow, 16);
         if (!open) { learnPanels(a, c); infoPanels(a, c); return; }
         add(c, label(a, "الاختبار أو البنك"), 10);
-        bankSpinner(a, c);
+        bankPicker(a, c);
         add(c, label(a, "طريقة التجربة"), 14);
         modeSeg(a, c);
         add(c, detail(a, s.setupMode.equals("study")
@@ -133,17 +136,6 @@ final class Screens {
             "ادخل الموقع قبل الميعاد بـ20 دقيقة على الأقل.",
             "ممنوع فتح أي متصفح أو موقع تاني، أو استخدام أجهزة تانية أو سماعات خارجية، والمخالفة بتلغي الامتحان.",
             "في كل دور 3 امتحانات فعلية، تنجح في أي واحد منهم، والمحسوب آخر امتحان تدخله. لو نجحت من أول مرة الأفضل ما تدخلش تاني."};
-    static final String[] INFO_UNCONFIRMED = {"توزيع الأسئلة: 40 جراحة وباطنة وحالات حرجة، 25 نساء وتوليد، 25 أطفال، 10 إدارة تمريض.",
-            "نسبة النجاح 60٪.",
-            "الدرجات متعلقة بالمستوى العام للكلية والترتيب (Rank) بين الكليات، مش بمكان التعيين.",
-            "الموبايل أو التابلت غير مقبول في أي امتحان (تجريبي أو محاكاة أو فعلي)، والموبايل يتستخدم بس في تسجيل البيانات على الموقع.",
-            "تأكد إن الإيميل وكلمة السر اللي سجلتهم صح وشغالين، لأنهم نفس البيانات المبعوتة للمجلس."};
-    static final String[] PAY_NOTES = {"الدفع بالرقم القومي (كود الدفع)، ورسوم المصريين وقتها كانت 200 جنيه.",
-            "لو ما دفعتش في الميعاد ما تقدرش تدخل الامتحان ولا تسجّل على الموقع.",
-            "رسوم كل دور منفصلة، ولو دفعت في دور تلتزم بالامتحان في نفس الدور.",
-            "اتأكد من الرقم القومي وكود الدفع والاسم اللي بيظهر وقت الدفع.",
-            "اتأكد إن المدفوعة باسم المجلس الصحي المصري، واحتفظ بإيصال الدفع لحد ما تظهر النتيجة.",
-            "الدفع من تطبيق على موبايلك لازم يكون لنفس الشخص، ومينفعش من بروفايل شخص تاني."};
 
     static void bullets(MainActivity a, LinearLayout c, String[] items, boolean numbered) {
         Theme t = a.theme;
@@ -154,25 +146,30 @@ final class Screens {
         }
     }
     static void infoPanels(MainActivity a, LinearLayout c) {
-        Theme t = a.theme;
-        panelTitle(a, c, "تعليمات الامتحان الفعلي", "للطلاب");
-        add(c, detail(a, "دي تعليمات امتحان المزاولة الحقيقي، مش قواعد الكويز ده."), 6);
-        add(c, label(a, "متأكد منها (من موقع المجلس الصحي المصري)"), 10);
-        bullets(a, c, INFO_CONFIRMED, false);
-        TextView link = Ui.tv(a, "صفحة الاختبار على موقع المجلس", 13.5f, t.bodyB(), t.dark ? Theme.D_SOFT : Theme.L_TEAL);
-        link.setMinHeight(dp(a,44)); link.setGravity(Gravity.CENTER_VERTICAL);
-        link.setOnClickListener(v -> { try { a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://ims.ehc.gov.eg/ar/profession-practise-exam-for-nursing-and-midwifery-professions"))); } catch (Exception ignore) {} });
-        add(c, link, 10);
-        add(c, label(a, "من منشور متداول، ما لقيناهاش في صفحة المجلس"), 16);
-        add(c, detail(a, "راجعها مع كليتك أو المجلس قبل ما تعتمد عليها."), 4);
-        bullets(a, c, INFO_UNCONFIRMED, false);
-        panelTitle(a, c, "سداد الرسوم", "إشعار قديم");
-        add(c, detail(a, "ده إشعار قديم من يوليو 2024. المواعيد والرسوم فيه خاصة بالدور ده، مش بالدور الحالي. اسأل كليتك أو المجلس عن ميعاد ورسوم دورك."), 6);
-        add(c, label(a, "الخطوات وقتها"), 10);
-        bullets(a, c, new String[]{"خدمات أو مدفوعات حكومية.", "المجلس الصحي المصري.", "اكتب الرقم القومي (كود الدفع)."}, true);
-        add(c, detail(a, "الدفع كان من 1 إلى 14 يوليو 2024، عن طريق شركات التحصيل (أمان، أموال، طلقة، سمارت باي، بساطة، جيديا) أو تطبيقات دفع."), 8);
-        add(c, label(a, "تعليمات ما زالت مفيدة"), 10);
-        bullets(a, c, PAY_NOTES, false);
+        // S3-10: collapsible (exam panel open by default, matching web <details open>); S4-3: the
+        // unconfirmed stats (60٪ pass rate, question split) and the stale July 2024 payment panel are
+        // removed entirely — Mohamed's rule: no verification wording or unconfirmed numbers in the UI.
+        infoHeader(a, c, "تعليمات الامتحان الفعلي", "للطلاب", a.infoExamOpen, () -> { a.infoExamOpen = !a.infoExamOpen; a.renderAll(); });
+        if (a.infoExamOpen) {
+            add(c, detail(a, "دي تعليمات امتحان المزاولة الحقيقي، مش قواعد الكويز ده."), 6);
+            bullets(a, c, INFO_CONFIRMED, false);
+        }
+    }
+
+    /** Collapsible section header with a chevron (used by the info panels). */
+    static void infoHeader(MainActivity a, LinearLayout c, String title, String count, boolean open, Runnable toggle) {
+        LinearLayout trow = new LinearLayout(a);
+        trow.setOrientation(LinearLayout.HORIZONTAL);
+        trow.setGravity(Gravity.CENTER_VERTICAL);
+        trow.setMinimumHeight(dp(a,48));
+        trow.addView(Ui.tv(a, title, 18, a.theme.dispB(), a.theme.head()), new LinearLayout.LayoutParams(0,-2,1f));
+        TextView cnt = Ui.tv(a, count, 12.5f, a.theme.dispB(), a.theme.muted());
+        LinearLayout.LayoutParams cpp = new LinearLayout.LayoutParams(-2, -2);
+        cpp.leftMargin = dp(a, 12);
+        trow.addView(cnt, cpp);
+        trow.addView(Ui.tv(a, open ? "▾" : "◂", 16, a.theme.dispB(), a.theme.muted()));
+        trow.setOnClickListener(v -> toggle.run());
+        add(c, trow, 22);
     }
 
     static void learnPanels(MainActivity a, LinearLayout c) {
@@ -301,7 +298,9 @@ final class Screens {
             box.setBackground(Ui.roundStroke(t.card55(), dp(a,14), Theme.L_GOLD, dp(a,1)));
         }
         String msg = a.confirmAction.equals("finish")
-            ? "في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟"
+            ? (s.blank() > 0
+                ? "في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟"
+                : "كل الأسئلة مجاوبة. تسلّم دلوقتي وتعرض النتيجة؟")
             : "هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.";
         box.addView(detail(a, msg));
         LinearLayout row = new LinearLayout(a);
@@ -320,28 +319,65 @@ final class Screens {
         add(c, box, 10);
     }
 
-    static void bankSpinner(MainActivity a, LinearLayout c) {
+    /** S4-5: in-page grouped bank picker with search (web parity), replacing the flat AlertDialog list.
+     *  Banks stay grouped by their index.json group ("tests" first); tapping one selects it and its minutes.
+     *  The search filters the list in place (no full re-render) so the keyboard and focus survive typing. */
+    static void bankPicker(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme;
-        java.util.List<Bank.BankMeta> all = a.bank.banks;
-        String[] names = new String[all.size()];
-        for (int i=0;i<names.length;i++) names[i] = all.get(i).name + " · " + Ui.toAr(String.valueOf(all.get(i).count)) + " سؤال";
-        int sel = 0;
-        for (int i=0;i<all.size();i++) if (all.get(i).id.equals(s.setupSection)) sel = i;
-        TextView tv = new TextView(a);
-        tv.setText(names[sel] + "  ▾");
-        tv.setTypeface(t.bodyB()); tv.setTextSize(13);
-        tv.setTextColor(t.dark ? Theme.D_OPTTEXT : Theme.L_TEAL);
-        tv.setGravity(android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.RIGHT);
-        tv.setPadding(dp(a,14),0,dp(a,14),0);
-        tv.setBackground(Ui.roundStroke(t.card55(), dp(a,12), t.dark?Theme.D_BORDER4:0x550b4f4a, dp(a,1)));
-        tv.setOnClickListener(v -> new android.app.AlertDialog.Builder(a).setItems(names, (d, pos) -> {
-            Bank.BankMeta m = all.get(pos);
-            if (!m.id.equals(s.setupSection)) { s.setupSection = m.id; s.minutes = m.minutes; a.save(); }
-            tv.setText(names[pos] + "  ▾");
-        }).show());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(a,46));
-        lp.topMargin = dp(a,6);
-        c.addView(tv, lp);
+        android.widget.EditText search = new android.widget.EditText(a);
+        search.setHint("ابحث عن بنك…");
+        search.setText(a.bankQuery);
+        search.setTextSize(13);
+        search.setTypeface(t.body());
+        search.setTextColor(t.ink());
+        search.setHintTextColor(t.muted());
+        search.setBackground(Ui.roundStroke(t.card55(), dp(a,12), t.border3(), dp(a,1)));
+        search.setPadding(dp(a,14), dp(a,10), dp(a,14), dp(a,10));
+        search.setSingleLine(true);
+        search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        add(c, search, 6);
+        LinearLayout list = new LinearLayout(a);
+        list.setOrientation(LinearLayout.VERTICAL);
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence ch, int st, int co, int af) {}
+            @Override public void onTextChanged(CharSequence ch, int st, int be, int co) {}
+            @Override public void afterTextChanged(android.text.Editable e) { a.bankQuery = e.toString(); fillBankList(a, list); }
+        });
+        fillBankList(a, list);
+        add(c, list, 4);
+    }
+
+    static void fillBankList(MainActivity a, LinearLayout list) {
+        Session s = a.s; Theme t = a.theme;
+        list.removeAllViews();
+        java.util.LinkedHashMap<String, java.util.List<Bank.BankMeta>> groups = new java.util.LinkedHashMap<>();
+        for (Bank.BankMeta m : a.bank.banks) {
+            if (!a.bankQuery.isEmpty() && !m.name.contains(a.bankQuery)) continue;
+            if (!groups.containsKey(m.group)) groups.put(m.group, new java.util.ArrayList<Bank.BankMeta>());
+            groups.get(m.group).add(m);
+        }
+        boolean any = false;
+        for (java.util.Map.Entry<String, java.util.List<Bank.BankMeta>> e : groups.entrySet()) {
+            int totalQ = 0; for (Bank.BankMeta m : e.getValue()) totalQ += m.ids.length;
+            add(list, Ui.tv(a, (e.getKey().equals("tests") ? "الاختبارات" : e.getKey()) + " · " + Ui.toAr(String.valueOf(totalQ)) + " سؤال", 12, t.dispB(), t.muted()), 10);
+            for (Bank.BankMeta m : e.getValue()) {
+                any = true;
+                boolean on = m.id.equals(s.setupSection);
+                Button b = new Button(a);
+                b.setText(m.name + " · " + Ui.toAr(String.valueOf(m.ids.length)) + " سؤال");
+                b.setAllCaps(false); b.setTextSize(13); b.setTypeface(t.disp());
+                b.setMinHeight(dp(a,46)); b.setMinimumHeight(dp(a,46));
+                b.setStateListAnimator(null);
+                b.setPadding(dp(a,14), dp(a,8), dp(a,14), dp(a,8));
+                b.setBackground(Ui.roundStroke(on ? t.primary() : t.card55(), dp(a,12), on ? t.primary() : t.border3(), dp(a,1.5f)));
+                b.setTextColor(on ? t.onAccent() : t.ink());
+                b.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+                final Bank.BankMeta fm = m;
+                b.setOnClickListener(v -> { if (!fm.id.equals(s.setupSection)) { s.setupSection = fm.id; s.minutes = fm.minutes; a.save(); } a.renderAll(); });
+                add(list, b, 6);
+            }
+        }
+        if (!any) add(list, detail(a, "مفيش نتائج للبحث."), 10);
     }
 
     static void modeSeg(MainActivity a, LinearLayout c) {
@@ -361,7 +397,7 @@ final class Screens {
             b.setOnClickListener(v -> { s.setupMode = o[0]; a.save(); a.renderAll(); });
             seg.addView(b, new LinearLayout.LayoutParams(0,-2,1f));
         }
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2,-2);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2); // S4-6: full width, like the minutes segment
         lp.topMargin = dp(a,6);
         c.addView(seg, lp);
     }
@@ -375,8 +411,10 @@ final class Screens {
             LinearLayout tr = new LinearLayout(a);
             tr.setOrientation(LinearLayout.HORIZONTAL);
             tr.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-            TextView ic = Ui.tv(a, "⏱", 13, t.disp(), t.ink());
-            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-2, -2);
+            android.widget.ImageView ic = new android.widget.ImageView(a);
+            ic.setImageResource(R.drawable.ic_clock);
+            ic.setColorFilter(t.ink());
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(a,16), dp(a,16));
             ip.setMargins(dp(a, 4), 0, 0, 0); // gap on the side facing the time view
             tr.addView(ic, ip); // RTL row: first child sits rightmost
             tr.addView(Ui.timeView(a, s.elapsed, 13, t.disp(), t.ink()));
@@ -432,7 +470,13 @@ final class Screens {
             LinearLayout tr = new LinearLayout(a);
             tr.setOrientation(LinearLayout.HORIZONTAL);
             tr.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-            TextView lb = Ui.tv(a, "⏱ وقت الحل:", 13, t.disp(), t.ink());
+            android.widget.ImageView ic = new android.widget.ImageView(a);
+            ic.setImageResource(R.drawable.ic_clock);
+            ic.setColorFilter(t.ink());
+            LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(a,16), dp(a,16));
+            ip.setMargins(dp(a, 4), 0, 0, 0);
+            tr.addView(ic, ip);
+            TextView lb = Ui.tv(a, "وقت الحل:", 13, t.disp(), t.ink());
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(dp(a, 4), 0, 0, 0);
             tr.addView(lb, lp);
@@ -441,10 +485,13 @@ final class Screens {
         }
         add(c, detail(a, "الأسئلة المتروكة محسوبة في الدرجة."), 6);
         Button all = btn(a, "مراجعة كل الإجابات", true);
-        all.setOnClickListener(v -> { a.resultSeen = true; a.openReview("all"); });
+        all.setOnClickListener(v -> a.openReview("all"));
         add(c, all, 12);
         Button wr = btn(a, "مراجعة الغلط فقط (" + Ui.toAr(String.valueOf(wrong)) + ")", false);
-        wr.setOnClickListener(v -> { a.resultSeen = true; a.openReview("wrong"); });
+        // S4-2: with no wrong answers the button must not open an empty review screen.
+        wr.setEnabled(wrong > 0);
+        wr.setAlpha(wrong > 0 ? 1f : .35f);
+        wr.setOnClickListener(v -> a.openReview("wrong"));
         add(c, wr, 8);
     }
 
@@ -504,10 +551,7 @@ final class Screens {
             TextView total = Ui.tv(a, "/ " + view.size(), 11, t.dispB(), t.muted());
             total.setPadding(dp(a,8),0,dp(a,8),0);
             row.addView(total);
-            Button map = new Button(a);
-            map.setText("☰"); map.setTextSize(16); map.setTypeface(t.disp());
-            map.setTextColor(t.ink()); map.setBackgroundColor(Color.TRANSPARENT);
-            map.setStateListAnimator(null);
+            android.widget.ImageView map = iconChip(a, false, R.drawable.ic_map, "خريطة الأسئلة");
             map.setOnClickListener(v -> showMap(a, view));
             row.addView(map, new LinearLayout.LayoutParams(dp(a,44), dp(a,44)));
             LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(a,44));
@@ -523,16 +567,14 @@ final class Screens {
         if (a.bank.missingImage(q.gid))
             add(c, detail(a, "الصورة المشار إليها غير موجودة في المصدر."), 8);
 
-        // tools row: translate chip, explain, hint chip
+        // tools row: translate chip, explain, hint chip — all real vector icons (S4-7), no emoji/text glyphs
         LinearLayout tools = new LinearLayout(a);
         tools.setGravity(Gravity.CENTER_VERTICAL);
-        Button tr = chip(a, a.trOpen);
-        tr.setText("文A"); tr.setTextSize(11);
+        android.widget.ImageView tr = iconChip(a, a.trOpen, R.drawable.ic_translate, "الترجمة");
         tr.setOnClickListener(v -> { a.trOpen = !a.trOpen; a.renderAll(); });
         tools.addView(tr, new LinearLayout.LayoutParams(dp(a,44), dp(a,44)));
         {
-            Button fl = chip(a, s.favorites.contains(q.gid));
-            fl.setText("⚑"); fl.setTextSize(14);
+            android.widget.ImageView fl = iconChip(a, s.favorites.contains(q.gid), R.drawable.ic_flag, "راجعني");
             fl.setOnClickListener(v -> { if (!s.favorites.remove(q.gid)) s.favorites.add(q.gid); a.save(); a.renderAll(); });
             LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
             fp.setMargins(dp(a,6),0,0,0);
@@ -543,11 +585,9 @@ final class Screens {
         if (clipFile != null && feedback && (answered || s.submitted)) {
             final String cf = clipFile;
             boolean on0 = ClipPlayer.isPlaying(cf);
-            Button sp = chip(a, on0);
-            sp.setText(on0 ? "⏹" : "🔊"); sp.setTextSize(14);
-            sp.setContentDescription(on0 ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
+            android.widget.ImageView sp = iconChip(a, on0, on0 ? R.drawable.ic_stop : R.drawable.ic_audio, on0 ? "إيقاف الشرح الصوتي" : "اسمع الشرح");
             sp.setOnClickListener(v -> {
-                boolean on = ClipPlayer.toggle(a, cf, () -> a.renderAll());
+                boolean on = ClipPlayer.toggle(a, cf, s.volume, () -> a.renderAll());
                 a.renderAll();
             });
             LinearLayout.LayoutParams spp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
@@ -564,8 +604,7 @@ final class Screens {
             tools.addView(ex, ep);
         }
         if (s.mode.equals("study") && !s.submitted && !answered && s.hints) {
-            Button hint = chip(a, a.hintOpen);
-            hint.setText("💡"); hint.setTextSize(13);
+            android.widget.ImageView hint = iconChip(a, a.hintOpen, R.drawable.ic_bulb, "التلميح");
             hint.setOnClickListener(v -> { a.hintOpen = !a.hintOpen; a.renderAll(); });
             LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
             hp.setMargins(dp(a,6),0,0,0);
@@ -628,7 +667,7 @@ final class Screens {
             if (a.pending != null && a.pending == i) Fx.pop(a, opt, 240);
             else if (a.popOnce && selected && (showCorrect || showWrong)) Fx.pop(a, opt, 280);
             else if (a.popOnce && showCorrect && correct && feedback) Fx.pop(a, opt, 280);
-            if (!locked) opt.setOnClickListener(v -> { if (s.confirm) { a.pending = fi; a.renderAll(); } else a.commit(fi); });
+            if (!locked) opt.setOnClickListener(v -> { if (s.confirm) { a.pending = fi; a.pendingByQuestion.put(s.index, fi); a.renderAll(); } else a.commit(fi); });
             LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-1,-2);
             olp.topMargin = dp(a, s.spacious ? 14 : 7);
             opts.addView(opt, olp);
@@ -666,19 +705,22 @@ final class Screens {
         add(c, cta, 12);
     }
 
-    static Button chip(MainActivity a, boolean open) {
+    /** S4-7: circular icon chip with a real vector icon + contentDescription (TalkBack), matching web's SVG chips.
+     *  The gold flag in dark mode keeps the brand accent (S4-8). */
+    static android.widget.ImageView iconChip(MainActivity a, boolean open, int res, String desc) {
         Theme t = a.theme;
-        Button b = new Button(a);
-        b.setStateListAnimator(null);
+        android.widget.ImageView iv = new android.widget.ImageView(a);
+        iv.setImageResource(res);
+        iv.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
         if (open) { g.setColor(t.dark ? Theme.D_TEXT : Theme.L_TEAL); }
         else { g.setColor(t.dark ? Theme.D_CARD : 0x8cffffff); g.setStroke(dp(a,1.5f), t.dark ? Theme.D_BORDER4 : 0x4d0b4f4a); }
-        b.setBackground(g);
-        b.setTextColor(open ? (t.dark ? Theme.L_TEAL : Theme.L_BG) : t.ink());
-        b.setMinWidth(0); b.setMinHeight(0); b.setMinimumWidth(0); b.setMinimumHeight(0);
-        b.setPadding(0,0,0,0);
-        return b;
+        iv.setBackground(g);
+        iv.setColorFilter(open ? (t.dark ? Theme.L_TEAL : Theme.L_BG) : t.ink());
+        iv.setPadding(dp(a,11), dp(a,11), dp(a,11), dp(a,11));
+        iv.setContentDescription(desc);
+        return iv;
     }
     static Button toolBtn(MainActivity a, String txt) {
         Theme t = a.theme;
@@ -748,7 +790,8 @@ final class Screens {
         d.setContentView(sv);
         if (d.getWindow() != null) {
             d.getWindow().setBackgroundDrawable(Ui.round(t.sheet(), dp(a,22)));
-            d.getWindow().setLayout(-1, -2);
+            // S4-14: cap the height at 85% of the screen so the close button stays reachable on small phones.
+            d.getWindow().setLayout(-1, (int) (a.getResources().getDisplayMetrics().heightPixels * 0.85));
         }
         d.show();
     }
@@ -801,7 +844,8 @@ final class Screens {
         d.setContentView(sv);
         if (d.getWindow() != null) {
             d.getWindow().setBackgroundDrawable(Ui.round(t.sheet(), dp(a,22)));
-            d.getWindow().setLayout(-1, -2);
+            // S4-14: same height cap as the question map.
+            d.getWindow().setLayout(-1, (int) (a.getResources().getDisplayMetrics().heightPixels * 0.85));
         }
         d.show();
     }
@@ -814,7 +858,7 @@ final class Screens {
         b.setOnClickListener(v -> {
             // starting this clip stops the other one, so reset the other button's label too
             if (activeAudioBtn != null && activeAudioBtn != b) activeAudioBtn.setText("▶  " + activeAudioCap);
-            boolean on = ClipPlayer.toggle(a, file, () -> b.setText("▶  " + caption));
+            boolean on = ClipPlayer.toggle(a, file, a.s.volume, () -> b.setText("▶  " + caption));
             b.setText((on ? "■  " : "▶  ") + caption);
             activeAudioBtn = on ? b : null; activeAudioCap = caption;
         });
@@ -854,9 +898,6 @@ final class Screens {
         groupTitle(a, c, "الوقت");
         toggleRow(a, c, "إظهار العداد", "إخفاؤه مش بيوقف حساب الوقت.", s.timer, on -> s.timer = on);
         toggleRow(a, c, "وقت الحل بس", "العداد يقف في الرئيسية والإعدادات.", s.quizOnly, on -> s.quizOnly = on);
-        toggleRow(a, c, "المؤثرات الصوتية", "صوت للإجابة الصح وصوت للإجابة الغلط في المذاكرة فقط. في الامتحان مفيش أي صوت، عشان ما يكشفش الإجابة.", s.sounds, on -> s.sounds = on);
-        toggleRow(a, c, "حركة الاحتفال والاختيار", "نبضة خفيفة عند اختيار إجابة واحتفال صغير مع النتيجة العالية. بيتعطل تلقائيًا مع تقليل الحركة.", s.fx, on -> s.fx = on);
-        volumeRow(a, c);
         toggleRow(a, c, "عد تنازلي", "بدل الوقت المنقضي. عند الصفر يقفل الإجابات وتفضل المراجعة متاحة.", s.countdown, on -> s.countdown = on);
         minutesSeg(a, c);
         add(c, detail(a, "المدة محسوبة من بداية العداد. صفّره لو عايز تبدأ مدة كاملة."), 6);
@@ -870,6 +911,11 @@ final class Screens {
         zp.setMargins(dp(a,10),0,0,0);
         clockRow.addView(zero, zp);
         add(c, clockRow, 10);
+
+        groupTitle(a, c, "الصوت والمؤثرات"); // S4-10: same group and order as web settings
+        toggleRow(a, c, "المؤثرات الصوتية", "صوت للإجابة الصح وصوت للإجابة الغلط في المذاكرة فقط. في الامتحان مفيش أي صوت، عشان ما يكشفش الإجابة.", s.sounds, on -> s.sounds = on);
+        toggleRow(a, c, "حركة الاحتفال والاختيار", "نبضة خفيفة عند اختيار إجابة واحتفال صغير مع النتيجة العالية. بيتعطل تلقائيًا مع تقليل الحركة.", s.fx, on -> s.fx = on);
+        volumeRow(a, c);
 
         groupTitle(a, c, "نسخة احتياطية");
         add(c, detail(a, "بيطلع كود فيه إجاباتك ودفتر الغلطات والعلامات والنتايج والإعدادات. انسخه واحفظه في مكان، وارجع الصقه هنا أو في النسخة الأونلاين."), 4);
@@ -894,12 +940,27 @@ final class Screens {
             android.widget.EditText et = new android.widget.EditText(a);
             et.setHint("الصق الكود هنا"); et.setTextSize(11); et.setLayoutDirection(View.LAYOUT_DIRECTION_LTR); et.setMaxLines(6);
             new android.app.AlertDialog.Builder(a).setTitle("استرجاع").setMessage("ده هيستبدل التقدم الحالي على الجهاز ده بالنسخة اللي لصقتها.").setView(et)
-                .setPositiveButton("استرجع", (dd, w) -> {
-                    String m = Backup.restore(a, et.getText().toString());
-                    android.widget.Toast.makeText(a, m, android.widget.Toast.LENGTH_LONG).show();
+                .setPositiveButton("استرجاع", (dd, w) -> {
+                    final String code = et.getText().toString();
+                    // S3-6: second step — confirm the replacement before anything is touched.
+                    new android.app.AlertDialog.Builder(a).setTitle("تأكيد الاسترجاع")
+                        .setMessage("متأكد؟ التقدم الحالي هيتبدل بالنسخة اللي لصقتها.")
+                        .setPositiveButton("استبدل", (dd2, w2) -> {
+                            String m = Backup.restore(a, code);
+                            android.widget.Toast.makeText(a, m, android.widget.Toast.LENGTH_LONG).show();
+                        }).setNegativeButton("رجوع", null).show();
                 }).setNegativeButton("رجوع", null).show();
         });
         add(c, rs, 8);
+        if (Session.hasBeforeRestore(a)) {
+            Button undo = btn(a, "تراجع عن آخر استرجاع", false);
+            undo.setOnClickListener(v -> {
+                new android.app.AlertDialog.Builder(a).setMessage("هيرجع التقدم اللي كان موجود قبل آخر استرجاع.")
+                    .setPositiveButton("ارجع", (dd, w) -> a.undoLastRestore())
+                    .setNegativeButton("رجوع", null).show();
+            });
+            add(c, undo, 8);
+        }
         final String legacy = Session.legacyRaw(a);
         if (legacy != null) {
             add(c, detail(a, "فيه تقدم محفوظ من نسخة تانية (مش متحوّل). تقدر تصدّره وتحفظه."), 6);
@@ -938,7 +999,7 @@ final class Screens {
         s.dark=false; s.spacious=false; s.contrast=false; s.calm=false; s.steps=true; s.letters=true;
         s.confirm=false; s.autoNext=false; s.retry=false; s.hints=true; s.hintDefault=false;
         s.translation=false; s.autoExplain=false; s.timer=true; s.quizOnly=false; s.countdown=false;
-        s.fontPercent=100; s.sounds=true; s.fx=true; s.volume=80;
+        s.fontPercent=100; s.sounds=true; s.fx=true; s.volume=80; s.minutes=120; // S3-7: minutes reset too
         a.save(); a.renderAll();
     }
 

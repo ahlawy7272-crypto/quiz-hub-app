@@ -281,6 +281,7 @@ body { background: var(--ds-page); }
 /* Viewport app: native modal keeps its own scrolling body above the bottom bar. */
 .qz-app-dialog { padding:0; border:0; width:calc(100% - 16px); max-width:800px; height:calc(var(--instinct-modal-height, 100dvh) - 16px); max-height:calc(100% - 16px); background:#e4f5a4; color:#0b4f4a; overflow:hidden; border-radius:28px; box-sizing:border-box; }
 .qz-app-dialog::backdrop { background:#fff; }
+.qz-app-dialog:has(.qz-dark)::backdrop { background:#062f2c; } /* S4-8: no white frame around a dark app */
 .qz-app-dialog .qz-screen { height:100%; width:100%; display:flex; flex-direction:column; border-radius:28px; padding:0; overflow:hidden; box-sizing:border-box; }
 .qz-app-head { display:flex; flex:none; align-items:center; justify-content:space-between; padding:6px 18px; min-height:48px; border-bottom:1px solid #0b4f4a22; font-weight:600; font-size:13px; }
 .qz-scroll { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:14px 16px 35px; scrollbar-width:thin; }
@@ -381,6 +382,15 @@ body { background: var(--ds-page); }
 .qz-bank-input {box-sizing:border-box;width:100%;min-height:46px;font:inherit;font-size:13px;color:inherit;background:rgba(255,255,255,.55);border:1px solid #0b4f4a55;border-radius:12px;padding:10px;max-width:100%;}
 .qz-dark .qz-bank-input {background:#17483e;color:#eef6db;border-color:#cfe98a66;}
 .qz-bank-input option,.qz-bank-input optgroup {background:#f1f8db;color:#0b4f4a;}
+/* S4-4: in-page grouped bank picker */
+.qz-bank-search { margin-bottom: 10px; }
+.qz-bank-list { display:flex; flex-direction:column; gap:10px; }
+.qz-bank-group-label { margin:2px 0 0; font-size:12px; font-weight:700; color:#2f6a5f; }
+.qz-bank-opt { font:inherit; width:100%; text-align:start; min-height:46px; padding:10px 14px; border-radius:12px; border:1.5px solid rgba(11,79,74,.3); background:rgba(255,255,255,.55); color:#0b3f3b; font-size:13px; font-weight:600; cursor:pointer; }
+.qz-bank-opt.is-on { background:#0b4f4a; border-color:#0b4f4a; color:#e4f5a4; }
+.qz-dark .qz-bank-group-label { color:#b9d5b4; }
+.qz-dark .qz-bank-opt { background:#17483e; border-color:#cfe98a44; color:#eef6db; }
+.qz-dark .qz-bank-opt.is-on { background:#cfe98a; border-color:#cfe98a; color:#092f2c; }
 .qz-question-map {display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:10px;padding:8px 0;}
 .qz-question-map .qz-dot {width:44px;height:44px;font-size:12px;}
 .qz-map-trigger {margin-top:12px;}
@@ -414,8 +424,8 @@ body { background: var(--ds-page); }
 /* Flag button: gold when a question is flagged, so it reads differently from the other tool buttons (which turn teal when open). */
 .qz-flag-btn .qz-icon-chip { border-color: #b98a2f; }
 .qz-flag-btn.is-open .qz-icon-chip { background: #b98a2f; border-color: #b98a2f; color: #fff; }
-.qz-dark .qz-flag-btn .qz-icon-chip { border-color: #cfe98a; }
-.qz-dark .qz-flag-btn.is-open .qz-icon-chip { background: #cfe98a; border-color: #cfe98a; color: #092f2c; }
+.qz-dark .qz-flag-btn .qz-icon-chip { border-color: #d4a24c; } /* S4-8: brand gold in dark mode, not lime */
+.qz-dark .qz-flag-btn.is-open .qz-icon-chip { background: #d4a24c; border-color: #d4a24c; color: #092f2c; }
 .qz-progress-row .qz-map-trigger {margin:0;background:transparent;border-color:transparent;}
 .qz-is-solving .qz-question {margin-top:6px;}
 .qz-is-solving .qz-tools {margin-top:8px;gap:6px;}
@@ -427,7 +437,7 @@ body { background: var(--ds-page); }
 .qz-dark .qz-progress-total {color:#b9d5b4;}
 
 /* A single live text scale, including Arabic study help and the explanation sheet. */
-.qz-screen .qz-q-en {font-size:calc(15px * var(--qz-scale,1));}
+.qz-screen .qz-q-en {font-size:calc(16px * var(--qz-scale,1));} /* Phase 2: web parity with Android (was 15px) */
 .qz-screen .qz-opt-text {font-size:calc(15px * var(--qz-scale,1));}
 .qz-screen .qz-q-ar {font-size:calc(15px * var(--qz-scale,1));}
 .qz-screen .qz-hint,.qz-screen .qz-explain-body {font-size:calc(15px * var(--qz-scale,1));}

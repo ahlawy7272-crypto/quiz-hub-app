@@ -34,6 +34,9 @@ public final class Session {
 
     private static final String PREF = "quizhub_native_v1";
 
+    /** True when the last save() actually failed to write (storage full/blocked). */
+    public boolean saveFailed = false;
+
     /** Set when saved state pointed at a bank or question that does not exist in this build; shown once at startup. */
     public String notice = null;
 
@@ -76,6 +79,8 @@ public final class Session {
             if (s.notice != null && !p.contains("state_legacy_backup")) p.edit().putString("state_legacy_backup", raw).apply(); // keep the untouched old state
         } catch (Exception ignore) {
             if (!p.contains("state_legacy_backup")) p.edit().putString("state_legacy_backup", raw).apply(); // unreadable: keep it as is
+            // S3-5: a corrupt saved state used to restart silently; say so instead.
+            s.notice = "مقدرناش نقرا التقدم المحفوظ، فبدأنا من جديد. بياناتك القديمة محفوظة زي ما هي وتقدر تصدّرها من الإعدادات.";
         }
         return s;
     }
@@ -87,6 +92,14 @@ public final class Session {
         // Picked values are only '.' (stored as -1) or '0'..'4'; anything else is
         // corrupt data from another build, so reset just those answers to unanswered.
         for (int i = 0; i < picked.length; i++) if (picked[i] < -1 || picked[i] > 4) picked[i] = -1;
+        // Run kind: only these three values are valid; anything else is foreign data.
+        if (!run.equals("all") && !run.equals("notebook") && !run.equals("flagged")) run = "all";
+        // S1-1: a notebook/flagged run stores the run kind in bankKey (see MainActivity.begin).
+        // That is a live session of this build, not foreign data: accept it and point
+        // bankKey back at the real setup bank so nothing downstream has to guess.
+        if ((bankKey.equals("notebook") || bankKey.equals("flagged")) && bankKey.equals(run)) {
+            bankKey = bank.has(setupSection) ? setupSection : bank.banks.get(0).id;
+        }
         boolean bad = !bank.has(bankKey) || !bank.has(setupSection);
         for (int id : ids) if (id < 0 || id >= total) bad = true;
         for (int g : favorites) if (g < 0 || g >= total) bad = true;
@@ -135,7 +148,25 @@ public final class Session {
             j.put("picked", pk.toString());
             j.put("index", index);
             c.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putString("state", j.toString()).apply();
-        } catch (Exception ignore) {}
+            saveFailed = false;
+        } catch (Exception ignore) {
+            // S2-6: remember the failure instead of silently claiming "الحفظ مفعّل".
+            saveFailed = true;
+        }
+    }
+
+    /** True when a pre-restore copy exists (see keepBeforeRestore). */
+    public static boolean hasBeforeRestore(Context c) {
+        return c.getSharedPreferences(PREF, Context.MODE_PRIVATE).contains("state_before_restore");
+    }
+
+    /** Restores the copy saved by keepBeforeRestore() as the live state; returns false when there is none. */
+    public static boolean undoRestore(Context c) {
+        SharedPreferences p = c.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        String raw = p.getString("state_before_restore", null);
+        if (raw == null) return false;
+        p.edit().putString("state", raw).remove("state_before_restore").apply();
+        return true;
     }
 
     // ---- derived helpers (port of App.tsx logic) ----
