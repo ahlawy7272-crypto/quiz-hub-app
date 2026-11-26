@@ -135,6 +135,7 @@ function Drawer({ open, onClose, items, dark, onDark, fontPct, onFontScale }: {
                 {items.map(it => <button type="button" key={it.id} className="qz-drawer-item" disabled={it.disabled} onClick={() => { onClose(); it.action(); }}>{it.label}{it.badge && <span className="qz-drawer-badge"><bdi>{it.badge}</bdi></span>}</button>)}
             </nav>
             <div className="qz-drawer-theme">
+                <span className="qz-drawer-section">المظهر</span>
                 <div className="qz-font-row" dir="rtl"><span className="qz-font-row-label">حجم الخط</span><button type="button" className="qz-font-step" dir="ltr" aria-label="تصغير الخط" onClick={() => onFontScale(Math.max(70, fontPct - 10))}>A−</button><bdi className="qz-font-row-pct">{fontPct}%</bdi><button type="button" className="qz-font-step" dir="ltr" aria-label="تكبير الخط" onClick={() => onFontScale(Math.min(125, fontPct + 10))}>A+</button></div>
                 <div className="qz-set-row"><div><span className="qz-set-label" id="set-drawer-dark">الوضع الليلي</span></div><button type="button" className={'qz-switch' + (dark ? ' is-on' : '')} role="switch" aria-labelledby="set-drawer-dark" aria-checked={dark} onClick={() => onDark(!dark)}><span className="qz-switch-knob" /></button></div>
             </div>
@@ -278,8 +279,8 @@ function QuizView({ state, update, viewIds, jump, pick, expired, finish, review,
 }
 
 // ---- Home screen: hero card, exam list, result screen ----
-function HomeView({ state, update, open, finish, storage, celebrate, wrongSet, history, startRun, onCard }: {
-    state: Saved; update: (v: Partial<Saved>) => void; open: (filter: string) => void; finish: () => void;
+function HomeView({ state, update, open, finish, goHomeToList, storage, celebrate, wrongSet, history, startRun, onCard }: {
+    state: Saved; update: (v: Partial<Saved>) => void; open: (filter: string) => void; finish: () => void; goHomeToList: () => void;
     storage: string; celebrate: boolean; wrongSet: Set<number>; history: Attempt[];
     startRun: (r: Run) => void; onCard: (b: typeof banks[number]) => void;
 }) {
@@ -330,7 +331,7 @@ function HomeView({ state, update, open, finish, storage, celebrate, wrongSet, h
         <p className={'qz-home-title' + (!submitted && !started ? ' qz-home-quiz' : '')}>{submitted ? 'نتيجة التجربة' : started ? 'كمّل من مكانك' : bank.name}</p>
         {storage.startsWith('تنبيه') && <p className="qz-save-status" role="status">{storage}</p>}
         {started && submitted && <p className="qz-set-detail">{state.run === 'notebook' || state.run === 'flagged' ? runLabel(state.run) : (banks.find(b => b.ids.includes(ids[0])) || bank).name}</p>}
-        {submitted ? <><div className="qz-score-ring-wrap"><div className="qz-score-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle className="qz-ring-rail" cx="60" cy="60" r="52" /><circle className="qz-ring-arc" cx="60" cy="60" r="52" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={(state.settings.fx && !state.settings.calm) ? (ringOn ? 2 * Math.PI * 52 * (1 - pct / 100) : 2 * Math.PI * 52) : 2 * Math.PI * 52 * (1 - pct / 100)} /></svg><span className="qz-ring-pct"><bdi>{toAr(String(pct))}٪</bdi></span></div><span className="qz-ring-sub">{toAr(String(right))} صح من {toAr(String(ids.length))}</span></div><div className="qz-result-grid">{[[right, 'صح'], [wrong, 'غلط'], [blank, 'بدون إجابة']].map(([n, l]) => <div key={l}><b>{toAr(String(n))}</b><span>{l}</span></div>)}</div><p className="qz-home-time"><ClockIcon /> وقت الحل: <bdi>{formatTime(state.resultElapsed ?? elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={() => document.getElementById('qz-exam-list')?.scrollIntoView({ behavior: 'smooth' })}>الرجوع للرئيسية</button><button type="button" className="qz-btn primary" onClick={() => open('all')}>مراجعة كل الإجابات</button><button type="button" className="qz-btn ghost" disabled={wrong === 0} onClick={() => open('wrong')}>مراجعة الغلط فقط ({toAr(String(wrong))})</button></div></> : started ? (<><div className="qz-hero-card"><p className="qz-hero-name">{state.run === 'notebook' || state.run === 'flagged' ? runLabel(state.run) : (banks.find(b => b.ids.includes(ids[0])) || bank).name}</p><p className="qz-hero-sub">سؤال {toAr(String(Math.min(ids.length - blank + 1, ids.length)))} من {toAr(String(ids.length))} · {state.mode === 'exam' ? 'امتحان' : 'مذاكرة'}</p><div className="qz-hero-bar" role="progressbar" aria-valuenow={ids.length - blank} aria-valuemin={0} aria-valuemax={ids.length} aria-label="التقدم في التجربة"><span style={{ width: `${ids.length ? Math.round((ids.length - blank) / ids.length * 100) : 0}%` }} /></div><p className="qz-home-time"><ClockIcon /><bdi>{formatTime(elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn qz-gold" onClick={() => open('all')}>كمّل</button><button type="button" className="qz-btn ghost" onClick={finish}>إنهاء وعرض النتيجة</button></div></div>{sessionMap}</>) : null}
+        {submitted ? <><div className="qz-score-ring-wrap"><div className="qz-score-ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle className="qz-ring-rail" cx="60" cy="60" r="52" /><circle className="qz-ring-arc" cx="60" cy="60" r="52" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={(state.settings.fx && !state.settings.calm) ? (ringOn ? 2 * Math.PI * 52 * (1 - pct / 100) : 2 * Math.PI * 52) : 2 * Math.PI * 52 * (1 - pct / 100)} /></svg><span className="qz-ring-pct"><bdi>{toAr(String(pct))}٪</bdi></span></div><span className="qz-ring-sub">{toAr(String(right))} صح من {toAr(String(ids.length))}</span></div><div className="qz-result-grid">{[[right, 'صح'], [wrong, 'غلط'], [blank, 'بدون إجابة']].map(([n, l]) => <div key={l}><b>{toAr(String(n))}</b><span>{l}</span></div>)}</div><p className="qz-home-time"><ClockIcon /> وقت الحل: <bdi>{formatTime(state.resultElapsed ?? elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn primary" onClick={goHomeToList}>الرجوع للرئيسية</button><button type="button" className="qz-btn primary" onClick={() => open('all')}>مراجعة كل الإجابات</button><button type="button" className="qz-btn ghost" disabled={wrong === 0} onClick={() => open('wrong')}>مراجعة الغلط فقط ({toAr(String(wrong))})</button></div></> : started ? (<><div className="qz-hero-card"><p className="qz-hero-name">{state.run === 'notebook' || state.run === 'flagged' ? runLabel(state.run) : (banks.find(b => b.ids.includes(ids[0])) || bank).name}</p><p className="qz-hero-sub">سؤال {toAr(String(Math.min(ids.length - blank + 1, ids.length)))} من {toAr(String(ids.length))} · {state.mode === 'exam' ? 'امتحان' : 'مذاكرة'}</p><div className="qz-hero-bar" role="progressbar" aria-valuenow={ids.length - blank} aria-valuemin={0} aria-valuemax={ids.length} aria-label="التقدم في التجربة"><span style={{ width: `${ids.length ? Math.round((ids.length - blank) / ids.length * 100) : 0}%` }} /></div><p className="qz-home-time"><ClockIcon /><bdi>{formatTime(elapsed)}</bdi></p><div className="qz-action-stack"><button type="button" className="qz-btn qz-gold" onClick={() => open('all')}>كمّل</button><button type="button" className="qz-btn ghost" onClick={finish}>إنهاء وعرض النتيجة</button></div></div>{sessionMap}</>) : null}
         <div className="qz-setup" id="qz-exam-list">
             <span className="qz-set-label">طريقة التجربة</span><div className="qz-set-seg">{[['study', 'مذاكرة'], ['exam', 'امتحان']].map(([v, l]) => <button type="button" className={'qz-set-seg-btn' + (setup.mode === v ? ' is-on' : '')} key={v} aria-pressed={setup.mode === v} onClick={() => update({ setup: { ...setup, mode: v as Mode } })}>{l}</button>)}</div>
             {(wrongSet.size > 0 || flagIds.length > 0) && <div className="qz-learn-row">{wrongSet.size > 0 && <button type="button" className="qz-btn primary" onClick={() => startRun({ kind: 'notebook', ids: wrongIds })}>دفتر الغلطات ({toAr(String(wrongIds.length))})</button>}{flagIds.length > 0 && <button type="button" className="qz-btn primary" onClick={() => startRun({ kind: 'flagged', ids: flagIds })}>راجعني ({toAr(String(flagIds.length))})</button>}</div>}
@@ -437,6 +438,11 @@ function QuizHubApp() {
     const setState = (v: Saved | ((prev: Saved) => Saved)) => setStored(prev => encode(typeof v === 'function' ? v(decode(prev)) : v));
     const update = (v: Partial<Saved>) => { if (ready) setState(prev => ({ ...prev, ...v })); };
     const { tab, index, picked, elapsed, settings, paused, started, submitted, ids } = state;
+    // On the quiz tab while solving a live attempt — or while reviewing a
+    // submitted one (a finished attempt has started: false, but its review
+    // is still the quiz screen, with the timer, the map and the compact
+    // solving layout, exactly as before the submit).
+    const inQuiz = tab === 'quiz' && (started || submitted);
     const flagIds = [...state.favorites].sort((a, b) => a - b);
     const [opened, setOpened] = useState(true);
     const [review, setReview] = useState('all');
@@ -465,7 +471,14 @@ function QuizHubApp() {
     const viewIds = review === 'wrong' ? ids.filter(id => picked[id] !== null && picked[id] !== questions[id].c) : ids;
     const safeIndex = viewIds.includes(index) ? index : (viewIds[0] ?? index);
     useEffect(() => { setMasterVolume(settings.volume ?? 80); }, [settings.volume]);
-    useEffect(() => { scroller.current?.scrollTo({ top: 0 }); setAutoPending(false); }, [tab, index, review, confirmAction]);
+    useEffect(() => { scroller.current?.scrollTo({ top: 0 }); setAutoPending(false); }, [tab, index, review]);
+    // The confirm modal closes with Escape, like the drawer.
+    useEffect(() => {
+        if (!confirmAction) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setConfirmAction(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [confirmAction]);
     const ticking = ready && started && !submitted && !(allAnswered && state.mode === 'study') && !paused && !expired && opened && !(settings.quizOnly && tab !== 'quiz');
     useEffect(() => {
         if (!ticking) return;
@@ -525,7 +538,11 @@ function QuizHubApp() {
                 return { w: packBits(set), h };
             });
         }
-        update({ submitted: true, resultElapsed: liveElapsed, elapsed: liveElapsed, tab: 'home' });
+        // Finishing ends the live attempt (started: false) so no resume card
+        // can come back for it — the saved attempt is cleared. The result
+        // itself stays (submitted: true) for the result screen and for
+        // review, and it stays recorded in the attempt history above.
+        update({ submitted: true, started: false, resultElapsed: liveElapsed, elapsed: liveElapsed, tab: 'home' });
         setReview('all');
     };
     const begin = (run?: Run, section?: string) => {
@@ -569,11 +586,13 @@ function QuizHubApp() {
     // when the user explicitly begins one. Going home from a live quiz pauses
     // it — the clock used to keep ticking while the user thought he had left.
     const goHome = () => { setConfirmAction(null); setFocus(false); update({ tab: 'home', paused: started && !submitted ? true : paused }); };
-    // Back to home from review/result: land on the exam list. The saved
-    // result stays (scroll up to see it) — same scroll as the result
-    // screen's own button, delayed like the drawer search action so the
-    // home tab has rendered first.
-    const goHomeToList = () => { goHome(); setTimeout(() => { document.getElementById('qz-exam-list')?.scrollIntoView({ behavior: 'smooth' }); }, 80); };
+    // Back to home from review/result: land on the exam list, and dismiss
+    // the finished result — a submitted attempt is over, so home goes back
+    // to just the exam list with no result on top and no resume card for
+    // it. The result itself stays recorded in the attempt history (the exam
+    // card keeps showing "آخر نتيجة"), and leaving via the drawer or the
+    // header (goHome) still preserves the result screen, as before.
+    const goHomeToList = () => { goHome(); if (submitted) update({ submitted: false, started: false, resultElapsed: null }); setTimeout(() => { document.getElementById('qz-exam-list')?.scrollIntoView({ behavior: 'smooth' }); }, 80); };
     const open = (filter: string) => {
         setReview(filter);
         const list = filter === 'wrong' ? ids.filter(id => picked[id] !== null && picked[id] !== questions[id].c) : ids;
@@ -617,7 +636,7 @@ function QuizHubApp() {
     const drawerItems: DrawerItem[] = [
         { id: 'home', label: 'الرئيسية', action: () => goHome() },
         { id: 'search', label: 'بحث', action: () => { goHome(); setTimeout(() => { const el = document.getElementById('bank-search'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.focus(); }, 80); } },
-        ...(tab === 'quiz' && started ? [{ id: 'map', label: 'كل الأسئلة', action: () => setMapSignal(s => s + 1) }] : []),
+        ...(inQuiz ? [{ id: 'map', label: 'كل الأسئلة', action: () => setMapSignal(s => s + 1) }] : []),
         { id: 'flagged', label: 'المذكرة', badge: flagIds.length ? toAr(String(flagIds.length)) : undefined, disabled: flagIds.length === 0, action: () => { const r = { kind: 'flagged' as const, ids: flagIds }; if (started) { setPendingRun(r); setConfirmAction('start'); } else begin(r); } },
         { id: 'settings', label: 'الإعدادات', action: () => update({ tab: 'settings' }) },
         ...(started && !submitted ? [{ id: 'list', label: 'الرجوع للقائمة', action: () => goHome() }] : []),
@@ -628,21 +647,27 @@ function QuizHubApp() {
     }
 
     return (
-        <div className={screenCls + (tab === 'quiz' && started ? ' qz-is-solving' : '')} style={{ '--qz-scale': fontPercent(settings) / 100 } as React.CSSProperties} aria-label="Quiz Hub، أسئلة مزاولة المهنة">
-            <header className="qz-app-head">{!focus && <button type="button" className="qz-btn ghost qz-menu-btn" aria-label="القائمة" onClick={() => setDrawerOpen(true)}><MenuIcon /></button>}<QuizBrand compact />{tab === 'quiz' && started && !focus && settings.timer && <TimerPill elapsed={settings.countdown ? remaining : liveElapsed} countdown={settings.countdown} low={settings.countdown && remaining <= 300} />}{!(tab === 'quiz' && started) && <CloseButton label="قفل التجربة" onClick={() => { if (tab !== 'home') goHome(); else setOpened(false); }} />}</header>
+        <div className={screenCls + (inQuiz ? ' qz-is-solving' : '')} style={{ '--qz-scale': fontPercent(settings) / 100 } as React.CSSProperties} aria-label="Quiz Hub، أسئلة مزاولة المهنة">
+            <header className="qz-app-head">{!focus && <button type="button" className="qz-btn ghost qz-menu-btn" aria-label="القائمة" onClick={() => setDrawerOpen(true)}><MenuIcon /></button>}<QuizBrand compact />{inQuiz && !focus && settings.timer && <TimerPill elapsed={settings.countdown ? remaining : liveElapsed} countdown={settings.countdown} low={settings.countdown && remaining <= 300} />}{!inQuiz && <span className="qz-head-x" style={{ visibility: drawerOpen ? 'hidden' : 'visible' }}><CloseButton label="قفل التجربة" onClick={() => { if (tab !== 'home') goHome(); else setOpened(false); }} /></span>}</header>
             {burst > 0 && <div className="qz-confetti" key={burst} aria-hidden="true" data-testid="burst">{burstPieces.map((p, i) => <i key={i} style={{ left: `${p.left}%`, width: p.size, height: p.size * 1.4, background: p.color, animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s` }} />)}</div>}
             <div className="qz-scroll" ref={scroller}>
-                {!(tab === 'quiz' && started) && <div className="qz-topbar">
+                {!(inQuiz) && <div className="qz-topbar">
                     <span className="qz-mode">{!started ? 'إعداد التجربة' : state.mode === 'study' ? 'وضع المذاكرة' : 'وضع الامتحان'}</span>
                 </div>}
-                {(paused || (allAnswered && state.mode === 'study') || expired || submitted) && started && <p className="qz-clock-status">{expired ? 'الوقت خلص' : submitted ? 'تم التسليم، العداد متوقف' : allAnswered ? 'اكتملت الاختيارات، العداد متوقف' : 'العداد متوقف مؤقتًا'}</p>}
-                {confirmAction && <div className="qz-hint qz-confirm-box" role="alert"><p>{confirmAction === 'finish' ? (ids.some(id => picked[id] === null) ? 'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟' : 'كل الأسئلة مجاوبة. تسلّم دلوقتي وتعرض النتيجة؟') : 'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p><div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={() => { if (confirmAction === 'start') begin(pendingRun ?? undefined); else { doSubmit(); setConfirmAction(null); } }}>{confirmAction === 'start' ? 'ابدأ من جديد' : 'سلّم التجربة'}</button><button type="button" className="qz-btn ghost" onClick={() => setConfirmAction(null)}>رجوع</button></div></div>}
-                {tab === 'home' && <HomeView state={{ ...state, elapsed: liveElapsed }} update={update} onCard={onCard} open={open} finish={finish} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r => { if (started) { setPendingRun(r); setConfirmAction('start'); } else begin(r); }} />}
-                {tab === 'quiz' && started && <QuizView state={{ ...state, index: safeIndex }} update={update} viewIds={viewIds} jump={id => update({ index: id })} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome} goHomeToList={goHomeToList} attemptKey={attemptKey} focus={focus} setFocus={setFocus} mapSignal={mapSignal} onMapOpened={() => setMapSignal(0)} />}
-                {tab === 'quiz' && !started && <div className="qz-home"><p>اختار طريقة التجربة من الرئيسية الأول.</p><button type="button" className="qz-btn primary" onClick={() => update({ tab: 'home' })}>إعداد التجربة</button></div>}
+                {(paused || (allAnswered && state.mode === 'study') || expired || submitted) && (started || submitted) && <p className="qz-clock-status">{expired ? 'الوقت خلص' : submitted ? 'تم التسليم، العداد متوقف' : allAnswered ? 'اكتملت الاختيارات، العداد متوقف' : 'العداد متوقف مؤقتًا'}</p>}
+                {tab === 'home' && <HomeView state={{ ...state, elapsed: liveElapsed }} update={update} onCard={onCard} open={open} finish={finish} goHomeToList={goHomeToList} storage={storageFull} celebrate={celebrate} wrongSet={wrongSet} history={history} startRun={r => { if (started) { setPendingRun(r); setConfirmAction('start'); } else begin(r); }} />}
+                {inQuiz && <QuizView state={{ ...state, index: safeIndex }} update={update} viewIds={viewIds} jump={id => update({ index: id })} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome} goHomeToList={goHomeToList} attemptKey={attemptKey} focus={focus} setFocus={setFocus} mapSignal={mapSignal} onMapOpened={() => setMapSignal(0)} />}
+                {tab === 'quiz' && !started && !submitted && <div className="qz-home"><p>اختار طريقة التجربة من الرئيسية الأول.</p><button type="button" className="qz-btn primary" onClick={() => update({ tab: 'home' })}>إعداد التجربة</button></div>}
                 {tab === 'settings' && <SettingsView backup={{ make: makeBackup, restore: restoreBackup }} settings={settings} setSettings={v => update({ settings: v })} onReset={reset} paused={paused} setPaused={v => update({ paused: v })} resetClock={() => update({ elapsed: 0 })} />}
             </div>
             <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} items={drawerItems} dark={settings.dark} onDark={v => update({ settings: { ...settings, dark: v } })} fontPct={fontPercent(settings)} onFontScale={v => update({ settings: { ...settings, fontScale: v } })} />
+            {confirmAction && <div className="qz-modal-wrap">
+                <div className="qz-modal-scrim" onClick={() => setConfirmAction(null)} />
+                <div className="qz-modal qz-confirm-box" role="alertdialog" aria-label="تأكيد">
+                    <p>{confirmAction === 'finish' ? (ids.some(id => picked[id] === null) ? 'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟' : 'كل الأسئلة مجاوبة. تسلّم دلوقتي وتعرض النتيجة؟') : 'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p>
+                    <div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={() => { if (confirmAction === 'start') begin(pendingRun ?? undefined); else { doSubmit(); setConfirmAction(null); } }}>{confirmAction === 'start' ? 'ابدأ من جديد' : 'سلّم التجربة'}</button><button type="button" className="qz-btn ghost" onClick={() => setConfirmAction(null)}>رجوع</button></div>
+                </div>
+            </div>}
         </div>
     );
 }

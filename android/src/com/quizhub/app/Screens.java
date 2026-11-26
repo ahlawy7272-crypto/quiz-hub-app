@@ -142,33 +142,38 @@ final class Screens {
     // ================= HOME =================
     static void home(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme; Bank bank = a.bank;
+        // Demo home top lines (web .qz-topbar + .qz-clock-status): the setup
+        // mode first, then the clock status — both above the title, and no
+        // timer pill on home/result (the time lives in the resume card and
+        // in the result "وقت الحل" line, exactly like the demo).
+        add(c, Ui.tv(a, !s.started ? "إعداد التجربة" : s.mode.equals("study") ? "وضع المذاكرة" : "وضع الامتحان", 12, t.dispB(), t.muted()), 0);
+        if ((s.started || s.submitted) && (s.paused || (s.allAnswered() && s.mode.equals("study")) || s.expired() || s.submitted)) {
+            String msg = s.expired() ? "الوقت خلص" : s.submitted ? "تم التسليم، العداد متوقف"
+                    : s.allAnswered() ? "اكتملت الاختيارات، العداد متوقف" : "العداد متوقف مؤقتًا";
+            add(c, Ui.tv(a, msg, 12, t.dispB(), t.ink()), 6);
+        }
         LinearLayout top = new LinearLayout(a);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         Bank.BankMeta homeBank = bank.byId(s.setupSection);
         TextView mode = Ui.tv(a, s.submitted ? "نتيجة التجربة" : s.started ? "كمّل من مكانك" : (homeBank != null ? homeBank.name : "امتحان تجريبي"), 20, t.dispB(), t.head());
         top.addView(mode, new LinearLayout.LayoutParams(0,-2,1f));
-        if (s.timer && s.started) { LinearLayout.LayoutParams chp = new LinearLayout.LayoutParams(-2, -2); chp.setMarginStart(dp(a, 12)); top.addView(a.makeTimerChip(), chp); }
-        c.addView(top);
-
-        if (s.started && (s.paused || (s.allAnswered() && s.mode.equals("study")) || s.expired() || s.submitted)) {
-            String msg = s.expired() ? "الوقت خلص" : s.submitted ? "تم التسليم، العداد متوقف"
-                    : s.allAnswered() ? "اكتملت الاختيارات، العداد متوقف" : "العداد متوقف مؤقتًا";
-            add(c, Ui.tv(a, msg, 12, t.dispB(), t.ink()), 8);
-        }
-        if (a.confirmAction != null) { confirmBox(a, c); }
-
+        LinearLayout.LayoutParams tp2 = new LinearLayout.LayoutParams(-1,-2);
+        tp2.topMargin = dp(a, 10);
+        c.addView(top, tp2);
         // The save-status line shows ONLY when a save actually failed; otherwise nothing.
         if (s.saveFailed) {
             TextView save = Ui.tv(a, "تنبيه: آخر حفظ فشل — جرب تقفل التطبيق وتفتحه تاني، أو افضي مساحة.", 11.5f, t.dispB(), t.dark ? Theme.D_MISSED : 0xffb3242b);
             add(c, save, 10);
         }
 
-        if (s.started) {
+        // A finished attempt has started: false, but its result screen and
+        // its review still live on the home tab (submitted: true).
+        if (s.started || s.submitted) {
             a.ensureQs();
             if (s.submitted) add(c, detail(a, a.runLabel(s.run.equals("all") ? s.bankKey : s.run)), 6);
             if (s.submitted) { resultCard(a, c); }
-            else inProgressCard(a, c);
+            else { inProgressCard(a, c); sessionMap(a, c); }
         }
 
         modeSeg(a, c);
@@ -189,9 +194,17 @@ final class Screens {
 
     static void confirmBox(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme;
+        // Demo box: a white card with a gold accent strip on the right edge
+        // (web .qz-hint: border-inline-start 4px gold). The strip is the
+        // first child of the RTL row, so it sits on the right edge.
+        LinearLayout wrap = new LinearLayout(a);
+        wrap.setOrientation(LinearLayout.HORIZONTAL);
+        wrap.setBackground(Ui.round(t.card(), dp(a,14)));
+        View strip = new View(a);
+        strip.setBackgroundColor(t.dark ? Theme.D_GOLD : Theme.L_GOLD);
+        wrap.addView(strip, new LinearLayout.LayoutParams(dp(a,4), -1));
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setBackground(Ui.roundStroke(t.card55(), dp(a,14), t.dark?Theme.D_BORDER4:Theme.L_GOLD, dp(a,1)));
         box.setPadding(dp(a,14), dp(a,10), dp(a,14), dp(a,10));
         String msg = a.confirmAction.equals("finish")
             ? (s.blank() > 0
@@ -211,7 +224,8 @@ final class Screens {
         LinearLayout.LayoutParams rp2 = new LinearLayout.LayoutParams(-1,-2);
         rp2.topMargin = dp(a,10);
         box.addView(row, rp2);
-        add(c, box, 10);
+        wrap.addView(box, new LinearLayout.LayoutParams(0, -2, 1f));
+        add(c, wrap, 10);
     }
 
     /** The exam list: compact notebook/flagged actions, search, then cards
@@ -237,6 +251,7 @@ final class Screens {
             }
             add(c, row, 14);
         }
+        add(c, label(a, "الاختبار أو البنك"), 12);
         android.widget.EditText search = new android.widget.EditText(a);
         search.setHint("ابحث عن بنك…");
         search.setText(a.bankQuery);
@@ -406,6 +421,7 @@ final class Screens {
 
     static void modeSeg(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme;
+        add(c, label(a, "طريقة التجربة"), 12);
         LinearLayout seg = new LinearLayout(a);
         seg.setBackground(Ui.round(t.dark?0x14ffffff:0x140b4f4a, dp(a,999)));
         seg.setPadding(dp(a,3),dp(a,3),dp(a,3),dp(a,3));
@@ -469,6 +485,48 @@ final class Screens {
         add(c, card, 12);
     }
 
+    // ---------- session map on home (demo: "خريطة الأسئلة ▸" under the
+    // resume card, expanding inline to one card per question, each with its
+    // state — لسه / تم الاختيار / صح ✓ / غلط ✕ — tapping one jumps to it). ----------
+    static void sessionMap(MainActivity a, LinearLayout c) {
+        Session s = a.s; Theme t = a.theme;
+        TextView link = Ui.tv(a, a.sessionMapOpen ? "خريطة الأسئلة ▾" : "خريطة الأسئلة ▸", 13, t.dispB(), t.ink());
+        link.setOnClickListener(v -> { a.sessionMapOpen = !a.sessionMapOpen; a.renderAll(); });
+        add(c, link, 12);
+        if (!a.sessionMapOpen) return;
+        LinearLayout grid = new LinearLayout(a);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        int cols = Math.max(3, (a.getResources().getDisplayMetrics().widthPixels - dp(a, 32) + dp(a, 8)) / dp(a, 98));
+        LinearLayout row = null;
+        for (int p = 0; p < s.ids.length; p++) {
+            final int qi = p;
+            if (p % cols == 0) {
+                row = new LinearLayout(a);
+                LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
+                if (p > 0) rlp.topMargin = dp(a, 8);
+                grid.addView(row, rlp);
+            }
+            LinearLayout card = new LinearLayout(a);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackground(Ui.roundStroke(t.card(), dp(a,16), t.border(), dp(a,1.5f)));
+            card.setPadding(dp(a,14), dp(a,12), dp(a,14), dp(a,12));
+            card.addView(Ui.tv(a, "سؤال " + Ui.toAr(String.valueOf(p + 1)), 13, t.dispB(), t.head()));
+            String st = s.picked[qi] < 0 ? "لسه" : s.mode.equals("exam") ? "تم الاختيار"
+                    : s.picked[qi] == a.qs.get(qi).c ? "صح ✓" : "غلط ✕";
+            int stc = s.picked[qi] < 0 || s.mode.equals("exam") ? t.muted()
+                    : s.picked[qi] == a.qs.get(qi).c ? (t.dark ? 0xff7fd08a : Theme.L_TEAL) : (t.dark ? 0xffffb2aa : 0xffb3242b);
+            TextView stv = Ui.tv(a, st, 12, t.dispB(), stc);
+            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-2, -2);
+            slp.topMargin = dp(a, 8);
+            card.addView(stv, slp);
+            card.setOnClickListener(v -> { s.index = qi; a.openReview("all"); });
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (p % cols > 0) clp.setMarginStart(dp(a, 8));
+            row.addView(card, clp);
+        }
+        add(c, grid, 8);
+    }
+
     // ---------- result card ----------
     static void resultCard(MainActivity a, LinearLayout c) {
         Session s = a.s; Theme t = a.theme;
@@ -526,17 +584,19 @@ final class Screens {
             tr.addView(Ui.timeView(a, s.resultElapsed >= 0 ? s.resultElapsed : s.elapsed, 13, t.disp(), t.ink()));
             add(c, tr, 12);
         }
+        // Demo order: الرجوع للرئيسية (primary) first, then مراجعة كل
+        // الإجابات (primary), then مراجعة الغلط فقط (ghost).
+        Button home = btn(a, "الرجوع للرئيسية", true);
+        home.setOnClickListener(v -> a.goHomeToList());
+        add(c, home, 12);
         Button all = btn(a, "مراجعة كل الإجابات", true);
         all.setOnClickListener(v -> a.openReview("all"));
-        add(c, all, 12);
+        add(c, all, 8);
         Button wr = btn(a, "مراجعة الغلط فقط (" + Ui.toAr(String.valueOf(wrong)) + ")", false);
         wr.setEnabled(wrong > 0);
         wr.setAlpha(wrong > 0 ? 1f : .35f);
         wr.setOnClickListener(v -> a.openReview("wrong"));
         add(c, wr, 8);
-        Button home = btn(a, "الرجوع للرئيسية", false);
-        home.setOnClickListener(v -> a.scrollHomeToList());
-        add(c, home, 8);
     }
 
     static void quizEmpty(MainActivity a, LinearLayout c) {
@@ -630,13 +690,27 @@ final class Screens {
         // Tools row: translate, flag, audio (with waveform), explain, share,
         // hint, focus. In study mode the audio / explanation / translation
         // icons work BEFORE answering; in exam mode they stay after-answer only.
+        // The web demo wraps its one tools row into two visual rows (row 1:
+        // translate, flag, audio, explain, share; row 2: hint, focus) — a
+        // single Android row overflows the screen and pushes the last two
+        // tools off the left edge, which is why the phone showed only 6
+        // tools with no hint button and no تركيز. Two rows here, same order.
         LinearLayout tools = new LinearLayout(a);
         tools.setGravity(Gravity.CENTER_VERTICAL);
         android.widget.ImageView tr = iconChip(a, a.trOpen, R.drawable.ic_translate, "الترجمة");
         tr.setOnClickListener(v -> { a.trOpen = !a.trOpen; a.renderAll(); });
         tools.addView(tr, new LinearLayout.LayoutParams(dp(a,44), dp(a,44)));
         {
-            android.widget.ImageView fl = iconChip(a, s.favorites.contains(q.gid), R.drawable.ic_flag, "راجعني");
+            boolean flagged = s.favorites.contains(q.gid);
+            android.widget.ImageView fl = iconChip(a, flagged, R.drawable.ic_flag, "راجعني");
+            // Demo flag: a gold border always, gold fill when flagged (web
+            // .qz-flag-btn) — the generic chip's grey border is not the demo.
+            android.graphics.drawable.GradientDrawable fg = new android.graphics.drawable.GradientDrawable();
+            fg.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            if (flagged) { fg.setColor(t.dark ? Theme.D_GOLD : Theme.L_GOLD); }
+            else { fg.setColor(t.dark ? Theme.D_CARD : 0x8cffffff); fg.setStroke(dp(a,1.5f), t.dark ? Theme.D_GOLD : Theme.L_GOLD); }
+            fl.setBackground(fg);
+            fl.setColorFilter(flagged ? 0xffffffff : t.ink());
             fl.setOnClickListener(v -> { if (!s.favorites.remove(q.gid)) s.favorites.add(q.gid); a.save(); a.renderAll(); });
             LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
             fp.setMarginStart(dp(a,6));
@@ -682,12 +756,13 @@ final class Screens {
             share.setOnClickListener(v -> a.shareQuestion());
             tools.addView(share, shp);
         }
+        LinearLayout tools2 = new LinearLayout(a);
+        tools2.setGravity(Gravity.CENTER_VERTICAL);
         if (s.mode.equals("study") && !s.submitted && !answered && s.hints) {
             android.widget.ImageView hint = iconChip(a, a.hintOpen, R.drawable.ic_bulb, "التلميح");
             hint.setOnClickListener(v -> { a.hintOpen = !a.hintOpen; a.renderAll(); });
             LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(dp(a,44), dp(a,44));
-            hp.setMarginStart(dp(a,6));
-            tools.addView(hint, hp);
+            tools2.addView(hint, hp);
         }
         {
             Button foc = toolBtn(a, "تركيز");
@@ -695,9 +770,9 @@ final class Screens {
             LinearLayout.LayoutParams fop = new LinearLayout.LayoutParams(-2, dp(a,44));
             fop.setMarginStart(dp(a,6));
             foc.setOnClickListener(v -> { a.focus = true; a.renderAll(); });
-            tools.addView(foc, fop);
+            tools2.addView(foc, fop);
         }
-        if (!a.focus) add(c, tools, 6);
+        if (!a.focus) { add(c, tools, 6); add(c, tools2, 6); }
 
         if (a.trOpen && q.tr != null) {
             TextView trv = Ui.tv(a, q.tr, t.bodySize(), t.body(), t.bodyColor());

@@ -78,6 +78,7 @@ body { background: #F5F3EE; }
 }
 .qz-dark .qz-app-head { border-color: rgba(212, 162, 76, 0.2); }
 .qz-app-head > button { flex: none; }
+.qz-head-x { flex: none; }
 .qz-scroll {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: none;
   padding: 14px 16px 16px; scrollbar-width: thin; box-sizing: border-box;
@@ -431,7 +432,11 @@ body { background: #F5F3EE; }
 .qz-dark .qz-dot { background: #17483e; color: #F5F3EE; border-color: rgba(212, 162, 76, 0.27); }
 .qz-progress-row .qz-map-trigger { margin: 0; background: transparent; border-color: transparent; }
 
-/* ---- Drawer ---- */
+/* ---- Drawer ----
+ * The wrap is absolute, inset 0, inside the app-root .qz-screen — so the
+ * scrim + panel cover the whole viewport, including the quiz bottom bar
+ * (verified: the wrap rect equals the screen rect, and with the drawer
+ * open the topmost element at the nav/CTA centers is the drawer itself). */
 .qz-drawer-wrap { position: absolute; inset: 0; z-index: 30; visibility: hidden; }
 .qz-drawer-wrap.is-open { visibility: visible; }
 .qz-drawer-scrim { position: absolute; inset: 0; background: rgba(7, 46, 43, 0.45); opacity: 0; transition: opacity 0.25s ease; }
@@ -440,24 +445,49 @@ body { background: #F5F3EE; }
   position: absolute; top: 0; bottom: 0; inset-inline-start: 0; width: min(280px, 82%);
   background: #f5f3ee; box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
   transform: translateX(102%); transition: transform 0.25s ease;
-  display: flex; flex-direction: column; padding: 18px 16px; box-sizing: border-box;
+  display: flex; flex-direction: column; padding: 20px 16px 16px; box-sizing: border-box;
 }
 .qz-drawer-wrap.is-open .qz-drawer { transform: translateX(0); }
 .qz-dark .qz-drawer { background: #0b3b37; color: #F5F3EE; box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4); }
-.qz-drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.qz-drawer-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid rgba(11, 79, 74, 0.12); margin-bottom: 8px; }
+.qz-dark .qz-drawer-head { border-color: rgba(212, 162, 76, 0.2); }
 .qz-drawer-title { font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; font-size: 17px; font-weight: 700; }
 .qz-drawer-x { font: inherit; font-size: 15px; background: transparent; border: 1.5px solid rgba(11, 79, 74, 0.3); color: inherit; border-radius: 999px; width: 36px; height: 36px; cursor: pointer; }
 .qz-drawer-nav { display: flex; flex-direction: column; gap: 6px; }
-.qz-drawer-item { font: inherit; font-size: 15px; font-weight: 600; text-align: start; background: transparent; border: 1.5px solid transparent; border-radius: 12px; padding: 12px 14px; cursor: pointer; color: inherit; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.qz-drawer-item { font: inherit; font-size: 15px; font-weight: 600; text-align: start; background: transparent; border: 1.5px solid transparent; border-radius: 12px; padding: 12px 14px; min-height: 48px; box-sizing: border-box; cursor: pointer; color: inherit; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .qz-drawer-item:hover { background: rgba(11, 79, 74, 0.07); }
 .qz-drawer-item:disabled { opacity: 0.45; cursor: default; }
 .qz-drawer-badge { font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; font-size: 12px; background: #d4a24c; color: #fff; border-radius: 999px; padding: 2px 9px; }
-.qz-drawer-theme { margin-top: auto; padding-top: 14px; }
-.qz-drawer-theme .qz-font-row { margin: 0 0 12px; }
-.qz-font-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.qz-font-row-label { font-size: 12px; font-weight: 700; color: #2f6a5f; }
+/* Appearance section, pinned to the bottom: its own tinted card, clearly
+ * apart from the nav, with a small section label and flat rows inside —
+ * no boxed card-within-a-card, no cramped controls. */
+.qz-drawer-theme { margin-top: auto; background: rgba(11, 79, 74, 0.06); border: 1px solid rgba(11, 79, 74, 0.1); border-radius: 16px; padding: 12px 14px 6px; }
+.qz-dark .qz-drawer-theme { background: rgba(212, 162, 76, 0.08); border-color: rgba(212, 162, 76, 0.18); }
+.qz-drawer-section { display: block; font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; font-size: 12px; font-weight: 700; color: #2f6a5f; margin-bottom: 2px; }
+.qz-dark .qz-drawer-section { color: rgba(245, 243, 238, 0.65); }
+.qz-drawer-theme .qz-font-row { margin: 0; padding: 8px 0; }
+.qz-drawer-theme .qz-set-row { background: transparent; border: 0; border-top: 1px solid rgba(11, 79, 74, 0.1); border-radius: 0; padding: 10px 0 8px; margin: 0; }
+.qz-dark .qz-drawer-theme .qz-set-row { border-top-color: rgba(212, 162, 76, 0.15); }
+.qz-drawer-theme .qz-switch { background: rgba(11, 79, 74, 0.2); }
+.qz-dark .qz-drawer-theme .qz-switch { background: rgba(245, 243, 238, 0.25); }
+.qz-dark .qz-drawer-theme .qz-switch.is-on { background: #D4A24C; }
+
+/* ---- Confirm modal ----
+ * Finish / start-new confirmations are real centered modals, not inline
+ * strips at the top of the page: a dimmed overlay covers the whole
+ * viewport and the dialog sits in the middle, so the question cannot be
+ * missed wherever the tap happened (home card or quiz screen). Same texts
+ * and buttons as the old inline box, only the presentation changed. */
+.qz-modal-wrap { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 24px 20px; box-sizing: border-box; }
+.qz-modal-scrim { position: absolute; inset: 0; background: rgba(7, 46, 43, 0.55); }
+.qz-modal { position: relative; width: min(340px, 100%); background: rgba(255, 255, 255, 0.95); color: #0b4f4a; border: 1px solid rgba(11, 79, 74, 0.12); border-inline-start: 4px solid var(--qz-gold); border-radius: 14px; padding: 20px 18px 14px; box-sizing: border-box; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28); }
+.qz-dark .qz-modal { background: #17483e; color: #F5F3EE; border-color: rgba(212, 162, 76, 0.27); border-inline-start-color: #d4a24c; }
+.qz-modal p { margin: 0 0 6px; font-size: 15px; line-height: 1.8; font-weight: 600; }
+.qz-modal .qz-set-actions { padding: 10px 0 0; }
+.qz-font-row { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-top: 4px; }
+.qz-font-row-label { flex: 1; min-width: 0; white-space: nowrap; font-size: 12px; font-weight: 700; color: #2f6a5f; }
 .qz-font-step { font-family: 'Readex Pro', Tahoma, 'Segoe UI', sans-serif; font-size: 13px; font-weight: 700; min-width: 44px; min-height: 36px; border-radius: 999px; border: 1.5px solid rgba(11, 79, 74, 0.3); background: rgba(255, 255, 255, 0.55); color: #0b4f4a; cursor: pointer; }
-.qz-font-row-pct { font-size: 12px; font-weight: 700; }
+.qz-font-row-pct { font-size: 12px; font-weight: 700; min-width: 44px; text-align: center; }
 .qz-dark .qz-font-row-label { color: rgba(245, 243, 238, 0.65); }
 .qz-dark .qz-font-step { background: #17483e; border-color: rgba(212, 162, 76, 0.27); color: #F5F3EE; }
 

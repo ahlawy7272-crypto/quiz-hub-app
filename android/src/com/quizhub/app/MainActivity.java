@@ -59,8 +59,10 @@ public class MainActivity extends Activity {
 
     String review = "all";        // all | wrong
     String confirmAction = null;  // finish | start | null
+    android.app.Dialog confirmDialog; // centered modal for the confirmAction above, if any
     Boolean setupOpen = null;     // null = auto (!started)
     boolean trOpen=false, hintOpen=false;
+    boolean sessionMapOpen = false; // home "خريطة الأسئلة" expandable, transient
     Integer pending = null;
     boolean focus = false;        // focus mode: only the question + options (transient)
     long lastOptTapAt = 0; int lastOptTapIdx = -1; // double-tap-to-confirm tracking
@@ -227,7 +229,7 @@ public class MainActivity extends Activity {
             }
         });
         scroll.setOnTouchListener((v, ev) -> {
-            if (s != null && s.tab.equals("quiz") && s.started) gd.onTouchEvent(ev);
+            if (s != null && s.tab.equals("quiz") && (s.started || s.submitted)) gd.onTouchEvent(ev);
             return false;
         });
 
@@ -266,7 +268,11 @@ public class MainActivity extends Activity {
 
     void refreshHeader() {
         header.removeAllViews();
-        boolean solving = s.tab.equals("quiz") && s.started;
+        // Solving = on the quiz tab while answering a live attempt — or
+        // while reviewing a submitted one (a finished attempt has
+        // started: false, but its review is still the quiz screen, with the
+        // timer pill and the compact header, exactly as before the submit).
+        boolean solving = s.tab.equals("quiz") && (s.started || s.submitted);
         // Hamburger opens the side navigation drawer. Hidden in focus mode.
         if (!focus) {
             android.widget.ImageView menu = new android.widget.ImageView(this);
@@ -297,6 +303,7 @@ public class MainActivity extends Activity {
         name.setPadding(Ui.dp(this,7),0,0,0);
         brand.addView(name);
         if (solving) brand.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        else brand.setGravity(Gravity.CENTER);
         header.addView(brand, new LinearLayout.LayoutParams(0, -1, 1f));
         if (solving && !focus && s.timer) {
             View tc = makeTimerChip();
@@ -304,6 +311,23 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams tcp = new LinearLayout.LayoutParams(-2, -2);
             tcp.setMarginEnd(Ui.dp(this, 8));
             header.addView(tc, tcp);
+        } else if (!solving && !focus) {
+            // Close button on home/result (demo header: X + centered logo +
+            // hamburger, no timer pill). On home it closes the experience —
+            // Android has no launch gate, so this finishes the activity, the
+            // same as the system Back key on home; elsewhere it goes home.
+            TextView xc = new TextView(this);
+            xc.setText("✕");
+            xc.setTextSize(15);
+            xc.setTypeface(theme.disp());
+            xc.setGravity(Gravity.CENTER);
+            xc.setBackground(Ui.roundStroke(android.graphics.Color.TRANSPARENT, Ui.dp(this, 999), theme.border3(), Ui.dp(this, 1)));
+            xc.setTextColor(theme.ink());
+            xc.setContentDescription("قفل التجربة");
+            xc.setOnClickListener(v -> { if (s.tab.equals("home")) finish(); else goHome(); });
+            LinearLayout.LayoutParams xp = new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36));
+            xp.setMarginEnd(Ui.dp(this, 8));
+            header.addView(xc, xp);
         }
     }
 
@@ -447,7 +471,12 @@ public class MainActivity extends Activity {
         confirmAction = "finish"; renderAll();
     }
     void doFinishConfirmed() {
-        recordSubmit(); s.submitted = true; s.resultElapsed = s.elapsed; s.tab = "home"; review = "all"; confirmAction = null;
+        recordSubmit();
+        // Finishing ends the live attempt (started: false) so no resume card
+        // can come back for it — the saved attempt is cleared. The result
+        // itself stays (submitted: true) for the result screen and for
+        // review, and it stays recorded in the attempt history.
+        s.started = false; s.submitted = true; s.resultElapsed = s.elapsed; s.tab = "home"; review = "all"; confirmAction = null;
         save(); renderAll();
     }
     void reset() {
@@ -510,10 +539,16 @@ public class MainActivity extends Activity {
         x.setOnClickListener(v -> closeDrawer());
         head.addView(x, new LinearLayout.LayoutParams(Ui.dp(this,36), Ui.dp(this,36)));
         drawerPanel.addView(head);
+        // Divider under the header, like the web demo drawer.
+        View hdiv = new View(this);
+        hdiv.setBackgroundColor(theme.border3());
+        LinearLayout.LayoutParams hdp = new LinearLayout.LayoutParams(-1, Ui.dp(this, 1));
+        hdp.topMargin = Ui.dp(this, 12);
+        drawerPanel.addView(hdiv, hdp);
         // Items.
         drawerItem("الرئيسية", true, () -> { drawerOpen = false; goHome(); });
         drawerItem("بحث", true, () -> { drawerOpen = false; goHome(); if (homeSearch != null) homeSearch.post(() -> { homeSearch.requestFocus(); android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE); if (imm != null) imm.showSoftInput(homeSearch, 0); }); });
-        if (s.tab.equals("quiz") && s.started) drawerItem("كل الأسئلة", true, () -> { drawerOpen = false; Screens.showMap(this, quizView); });
+        if (s.tab.equals("quiz") && (s.started || s.submitted)) drawerItem("كل الأسئلة", true, () -> { drawerOpen = false; Screens.showMap(this, quizView); });
         int flagN = s.favorites.size();
         drawerItem("المذكرة" + (flagN > 0 ? " (" + Ui.toAr(String.valueOf(flagN)) + ")" : ""), flagN > 0, () -> {
             drawerOpen = false;
@@ -523,23 +558,37 @@ public class MainActivity extends Activity {
         });
         drawerItem("الإعدادات", true, () -> { drawerOpen = false; s.tab = "settings"; save(); renderAll(); });
         if (s.started && !s.submitted) drawerItem("الرجوع للقائمة", true, () -> { drawerOpen = false; goToList(); });
-        // Font-size toggle + dark-mode toggle pinned at the bottom.
+        // Appearance footer as a rounded card, exactly like the web demo
+        // drawer: tinted card, "المظهر" label, a one-line font row (the
+        // label never wraps), a divider, and the dark-mode switch.
         View spacer = new View(this);
         drawerPanel.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
-        Screens.groupTitle(this, drawerPanel, "المظهر");
+        LinearLayout foot = new LinearLayout(this);
+        foot.setOrientation(LinearLayout.VERTICAL);
+        int footBg = theme.dark ? 0x14D4A24C : 0x0F0B4F4A;
+        int footBorder = theme.dark ? 0x2ED4A24C : 0x1A0B4F4A;
+        foot.setBackground(Ui.roundStroke(footBg, Ui.dp(this, 16), footBorder, Ui.dp(this, 1)));
+        foot.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 6));
+        TextView ft = Ui.tv(this, "المظهر", 12, theme.dispB(), theme.muted());
+        LinearLayout.LayoutParams ftp = new LinearLayout.LayoutParams(-1, -2);
+        ftp.bottomMargin = Ui.dp(this, 2);
+        foot.addView(ft, ftp);
         LinearLayout fontRow = new LinearLayout(this);
         fontRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView fl = Ui.tv(this, "حجم الخط", 15, theme.disp(), theme.ink());
+        TextView fl = Ui.tv(this, "حجم الخط", 12, theme.disp(), theme.ink());
         fontRow.addView(fl, new LinearLayout.LayoutParams(0, -2, 1f));
         android.widget.Button fminus = new android.widget.Button(this);
         fminus.setText("A−"); fminus.setAllCaps(false); fminus.setTextSize(13); fminus.setTypeface(theme.dispB());
         fminus.setTextDirection(View.TEXT_DIRECTION_LTR);
+        // Buttons default to a 64dp min width, which squeezes the label and
+        // the percentage out of this row — clear it so the pills fit the text.
+        fminus.setMinimumWidth(0); fminus.setMinWidth(0);
         fminus.setMinHeight(Ui.dp(this,36)); fminus.setMinimumHeight(Ui.dp(this,36));
-        fminus.setPadding(Ui.dp(this,14),0,Ui.dp(this,14),0); fminus.setStateListAnimator(null);
+        fminus.setPadding(Ui.dp(this,8),0,Ui.dp(this,8),0); fminus.setStateListAnimator(null);
         fminus.setBackground(Ui.roundStroke(theme.card55(), Ui.dp(this,999), theme.border3(), Ui.dp(this,1.5f)));
         fminus.setTextColor(theme.ink());
         fminus.setOnClickListener(v -> { s.fontPercent = Math.max(70, s.fontPercent - 10); save(); renderAll(); });
-        fontRow.addView(fminus);
+        fontRow.addView(fminus, new LinearLayout.LayoutParams(-2, Ui.dp(this,36)));
         TextView fpct = Ui.tv(this, Ui.lre(Ui.toAr(String.valueOf(s.fontPercent)) + "٪"), 12, theme.disp(), theme.ink());
         fpct.setTextDirection(View.TEXT_DIRECTION_LTR);
         LinearLayout.LayoutParams fpp = new LinearLayout.LayoutParams(-2, -2);
@@ -548,24 +597,36 @@ public class MainActivity extends Activity {
         android.widget.Button fplus = new android.widget.Button(this);
         fplus.setText("A+"); fplus.setAllCaps(false); fplus.setTextSize(13); fplus.setTypeface(theme.dispB());
         fplus.setTextDirection(View.TEXT_DIRECTION_LTR);
+        fplus.setMinimumWidth(0); fplus.setMinWidth(0);
         fplus.setMinHeight(Ui.dp(this,36)); fplus.setMinimumHeight(Ui.dp(this,36));
-        fplus.setPadding(Ui.dp(this,14),0,Ui.dp(this,14),0); fplus.setStateListAnimator(null);
+        fplus.setPadding(Ui.dp(this,8),0,Ui.dp(this,8),0); fplus.setStateListAnimator(null);
         fplus.setBackground(Ui.roundStroke(theme.card55(), Ui.dp(this,999), theme.border3(), Ui.dp(this,1.5f)));
         fplus.setTextColor(theme.ink());
         fplus.setOnClickListener(v -> { s.fontPercent = Math.min(125, s.fontPercent + 10); save(); renderAll(); });
         LinearLayout.LayoutParams fpp2 = new LinearLayout.LayoutParams(-2, Ui.dp(this,36));
         fpp2.setMarginStart(Ui.dp(this,8));
         fontRow.addView(fplus, fpp2);
-        drawerPanel.addView(fontRow);
+        LinearLayout.LayoutParams frp = new LinearLayout.LayoutParams(-1, -2);
+        frp.topMargin = Ui.dp(this, 8);
+        frp.bottomMargin = Ui.dp(this, 8);
+        foot.addView(fontRow, frp);
+        View fdiv = new View(this);
+        fdiv.setBackgroundColor(theme.border3());
+        foot.addView(fdiv, new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
         LinearLayout darkRow = new LinearLayout(this);
         darkRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView darkLabel = Ui.tv(this, "الوضع الليلي", 15, theme.disp(), theme.ink());
+        TextView darkLabel = Ui.tv(this, "الوضع الليلي", 13, theme.disp(), theme.ink());
         darkRow.addView(darkLabel, new LinearLayout.LayoutParams(0, -2, 1f));
         android.widget.Switch darkSw = new android.widget.Switch(this);
         darkSw.setChecked(s.dark);
         darkSw.setOnCheckedChangeListener((v, on) -> { s.dark = on; save(); renderAll(); });
         darkRow.addView(darkSw);
-        drawerPanel.addView(darkRow);
+        LinearLayout.LayoutParams drp = new LinearLayout.LayoutParams(-1, -2);
+        drp.topMargin = Ui.dp(this, 10);
+        foot.addView(darkRow, drp);
+        LinearLayout.LayoutParams fop = new LinearLayout.LayoutParams(-1, -2);
+        fop.topMargin = Ui.dp(this, 12);
+        drawerPanel.addView(foot, fop);
     }
     void drawerItem(String label, boolean enabled, Runnable action) {
         android.widget.Button b = new android.widget.Button(this);
@@ -601,11 +662,15 @@ public class MainActivity extends Activity {
         focus = false; // leaving the quiz exits focus mode
         s.tab = "home"; save(); renderAll();
     }
-    /** Back to home from review/result: land on the exam list. The saved
-     *  result stays (scroll up to see it) — same scroll as the result
-     *  screen's own button. */
+    /** Back to home from review/result: land on the exam list, and dismiss
+     *  the finished result — a submitted attempt is over, so home goes back
+     *  to just the exam list with no result on top and no resume card for
+     *  it. The result itself stays recorded in the attempt history (the exam
+     *  card keeps showing the last result). goHome() on its own still
+     *  preserves the result screen, as before. */
     void goHomeToList() {
         goHome();
+        if (s.submitted) { s.started = false; s.submitted = false; s.resultElapsed = -1; save(); renderAll(); }
         scrollHomeToList();
     }
     /** Back to the exam list from a quiz — pauses the exam so the clock stops. */
@@ -724,7 +789,7 @@ public class MainActivity extends Activity {
         if (bankLoadFailed) return;
         if (s.tab.equals("home")) Screens.home(this, content);
         else if (s.tab.equals("quiz")) {
-            if (s.started) Screens.quiz(this, content);
+            if (s.started || s.submitted) Screens.quiz(this, content);
             else Screens.quizEmpty(this, content);
         }
         else Screens.settings(this, content);
@@ -736,6 +801,38 @@ public class MainActivity extends Activity {
             drawerPanel.setVisibility(drawerOpen ? View.VISIBLE : View.GONE);
             if (drawerOpen) refreshDrawer();
         }
+        // Finish / start-new confirmation, as a centered modal dialog.
+        syncConfirmDialog();
+    }
+
+    /** Finish / start-new confirmations are real centered modal dialogs, not
+     *  inline strips at the top of the page: a dimmed overlay covers the
+     *  screen and the dialog sits in the middle, so the question cannot be
+     *  missed wherever the tap happened (home card or quiz screen). Same
+     *  texts and buttons as the old inline box, only the presentation
+     *  changed — the box itself is still built by Screens.confirmBox. */
+    void syncConfirmDialog() {
+        if (confirmAction == null) {
+            if (confirmDialog != null) { confirmDialog.dismiss(); confirmDialog = null; }
+            return;
+        }
+        if (confirmDialog != null && confirmDialog.isShowing()) return;
+        if (isFinishing()) return;
+        LinearLayout holder = new LinearLayout(this);
+        holder.setOrientation(LinearLayout.VERTICAL);
+        holder.setPadding(Ui.dp(this, 20), Ui.dp(this, 20), Ui.dp(this, 20), Ui.dp(this, 20));
+        Screens.confirmBox(this, holder);
+        android.app.Dialog d = new android.app.Dialog(this);
+        d.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        d.setContentView(holder);
+        if (d.getWindow() != null) {
+            d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            d.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        d.setCanceledOnTouchOutside(true);
+        d.setOnCancelListener(dlg -> { confirmAction = null; pendingRunKind = null; pendingRunIds = null; confirmDialog = null; renderAll(); });
+        confirmDialog = d;
+        d.show();
     }
 
     @Override public void onBackPressed() {
@@ -745,7 +842,7 @@ public class MainActivity extends Activity {
         else super.onBackPressed();
     }
 
-    @Override protected void onDestroy() { super.onDestroy(); tickerScheduled = false; if (handler != null) { if (ticker != null) handler.removeCallbacks(ticker); if (autoNextRun != null) handler.removeCallbacks(autoNextRun); } }
+    @Override protected void onDestroy() { super.onDestroy(); if (confirmDialog != null) { confirmDialog.dismiss(); confirmDialog = null; } tickerScheduled = false; if (handler != null) { if (ticker != null) handler.removeCallbacks(ticker); if (autoNextRun != null) handler.removeCallbacks(autoNextRun); } }
 
     @Override protected void onPause() { super.onPause(); ClipPlayer.stop(); tickerScheduled = false; if (handler != null && ticker != null) handler.removeCallbacks(ticker); if (s != null) save(); }
 
