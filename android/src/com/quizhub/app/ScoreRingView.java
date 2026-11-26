@@ -6,8 +6,8 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.View;
 
-/** Round 5: gold score ring for the result screen — fills to the achieved
- *  percentage, replacing the plain percentage text as the hero element. */
+/** Gold score ring for the result screen — fills to the achieved percentage.
+ *  The result screen shows ONLY the overall total (no per-bank bars). */
 public final class ScoreRingView extends View {
     private final Paint rail = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -41,9 +41,8 @@ public final class ScoreRingView extends View {
         text.setTextSize(Ui.dp(getContext(), 26));
         invalidate();
     }
-    /** Suggestion 32: the ring fills gradually up to the score (~1 s, gentle
-     *  ease-out). When animate is false (fx off / calm) it draws the final
-     *  value immediately, like set(). */
+    /** The ring fills gradually up to the score (~1 s, gentle ease-out).
+     *  When animate is false (fx off / calm) it draws the final value immediately. */
     public void animateTo(int percent, Theme t, boolean animate) {
         pct = Math.max(0f, Math.min(1f, percent / 100f));
         label = Ui.toAr(String.valueOf(percent)) + "٪";

@@ -13,11 +13,11 @@ import android.widget.TextView;
 import java.io.File;
 import java.io.FileOutputStream;
 
-/** Suggestion 35: render the current question as a designed brand image
- *  (question + options with the correct answer marked + explanation +
- *  translation) and share it through the system share sheet. The card is
- *  built from the same Views and fonts as the quiz screen, measured offscreen
- *  at a fixed width and drawn to a bitmap — no new fonts, no new assets. */
+/** Renders the current question as a designed brand image (question +
+ *  options with the correct answer marked + explanation + translation)
+ *  and shares it through the system share sheet. The card is built from
+ *  the same Views and fonts as the quiz screen, measured offscreen at a
+ *  fixed width and drawn to a bitmap. */
 public final class ShareCard {
     static final String FILE_NAME = "quiz-hub-question.png";
     private static final int TEAL = 0xff0b3b37;
@@ -25,8 +25,8 @@ public final class ShareCard {
     private static final int IVORY = 0xfff5f3ee;
     private static final int INK = 0xff1f2a2a;
     private static final int MUTED = 0xff5a6b68;
-    private static final int SOFT = 0xffcfe8e0;
-    private static final int CARD_W_DP = 411; // ~1080 px on a ~2.6x phone
+    private static final int SOFT = 0xa6F5F3EE; // muted ivory (65%) — subtitle text on the dark card
+    private static final int CARD_W_DP = 411;
 
     public static void share(MainActivity a, Bank.Question q, int chosen) {
         share(a, q, chosen, null);

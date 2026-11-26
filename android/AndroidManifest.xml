@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.quizhub.app"
-    android:versionCode="5"
-    android:versionName="1.4-audit-fixes">
-    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34"/>
-    <!-- Round 5: gentle haptic on select/confirm (normal permission, no prompt). -->
+    android:versionCode="6"
+    android:versionName="1.5-clean-rebuild">
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35"/>
+    <!-- Gentle haptic on select/confirm (normal permission, no prompt). -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <application
         android:label="Quiz Hub"
@@ -21,7 +21,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Suggestion 35: serves the rendered share image to the share sheet (framework-only provider, no library). -->
+        <!-- Serves the rendered share image to the share sheet (framework-only provider, no library). -->
         <provider android:name=".ShareFileProvider"
             android:authorities="com.quizhub.app.sharefile"
             android:exported="false"

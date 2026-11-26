@@ -4,7 +4,9 @@ import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.media.MediaPlayer;
 
-/** Plays one bundled audio clip at a time from assets/audio. */
+/** Plays one bundled audio clip at a time from assets/audio.
+ *  Clips are stored UNCOMPRESSED in the APK (see tools/build.sh) so
+ *  openFd() works; a cached-copy fallback exists anyway. */
 public final class ClipPlayer {
     private static MediaPlayer mp;
     private static String playing;
@@ -40,7 +42,6 @@ public final class ClipPlayer {
     public static String lastError = "";
     public static int fdFallbacks = 0;
 
-    /** Shows a plain-Arabic failure toast (the technical detail goes to logcat only, S4-9). */
     static void fail(Context c, String why) {
         lastError = why;
         android.util.Log.e("QuizHub", "audio failed: " + why + " fd-fallbacks=" + fdFallbacks);
@@ -80,7 +81,7 @@ public final class ClipPlayer {
         catch (Exception e) { return false; }
     }
 
-    /** Opens the clip as a data source: direct asset descriptor first, else a cached copy (works even if the asset were compressed). */
+    /** Opens the clip as a data source: direct asset descriptor first, else a cached copy. */
     private static void load(Context c, MediaPlayer m, String name) throws Exception {
         String r = resolve(c, name);
         try {
@@ -104,14 +105,12 @@ public final class ClipPlayer {
         return (mp != null || fakePlay) && name.equals(playing);
     }
 
-    /** Round 4: true when any explanation clip is loaded, so callers can skip a no-op stop(). */
     public static boolean isAnyPlaying() {
         return mp != null || fakePlay;
     }
 
     /** Toggle: starts the clip, or stops it if it is already playing. Returns true if now playing.
-     *  volume is 0-100 and now drives the explanation clip too (S2-2). Preparation is async
-     *  (S2-4) so a slow clip never freezes the UI thread. */
+     *  Preparation is async so a slow clip never freezes the UI thread. */
     public static boolean toggle(Context c, String name, int volume, Runnable onDone) {
         lastError = "";
         if (isPlaying(name)) { stop(); return false; }
@@ -146,7 +145,9 @@ public final class ClipPlayer {
         }
     }
 
-    /** Short feedback sound (study mode only; callers enforce). volume 0-100. */
+    /** Short feedback sound (correct/wrong). volume 0-100. The sfx files are
+     *  stored uncompressed in the APK, so openFd() works; a cached-copy
+     *  fallback covers the case where they were ever packaged compressed. */
     public static void sfx(Context c, boolean correct, int volume) {
         if (volume <= 0) return;
         try {
@@ -156,10 +157,6 @@ public final class ClipPlayer {
             try {
                 fd = c.getAssets().openFd("sfx/" + name);
             } catch (Exception first) {
-                // The sfx files used to be packaged DEFLATED (build.sh compressed
-                // everything except assets/audio), and openFd() throws for a
-                // compressed asset — so the sound silently never played. Fall back
-                // to a cached copy, like load() does for the explanation clips.
                 java.io.File out = new java.io.File(c.getCacheDir(), name);
                 if (!out.exists() || out.length() == 0) {
                     java.io.InputStream in = c.getAssets().open("sfx/" + name);
@@ -185,7 +182,7 @@ public final class ClipPlayer {
             m.setOnCompletionListener(x -> x.release());
             m.setOnErrorListener((x, w, e) -> { x.release(); return true; });
             m.setOnPreparedListener(x -> x.start());
-            m.prepareAsync(); // S2-4: never prepare on the main thread
+            m.prepareAsync();
         } catch (Exception e) { lastError = "sfx: " + e.getMessage(); }
     }
 }

@@ -10,8 +10,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-/** Question bank loaded from assets/bank (byte-preserved from gen18 bank-data.ts).
- *  Global question ids are explicit per bank (same ids arrays the web app used). */
+/** Question bank loaded from assets/bank. Global question ids are explicit
+ *  per bank (the parallel ids arrays). Data is byte-preserved; this class
+ *  only reads it. */
 public final class Bank {
 
     public static final class Question {
@@ -29,6 +30,16 @@ public final class Bank {
     }
 
     public final List<BankMeta> banks = new ArrayList<>();
+
+    /** Newest exam (May 2026 trial, id "0") — the default bank for a fresh start. */
+    public static final String DEFAULT_BANK_ID = "0";
+
+    /** The default bank for a fresh start: the newest exam; first bank in index
+     *  order when the newest exam is missing from this build. */
+    public BankMeta defaultBank() {
+        BankMeta m = byId(DEFAULT_BANK_ID);
+        return m != null ? m : banks.get(0);
+    }
     public final HashSet<Integer> missingImageIds = new HashSet<>();
     private final Context ctx;
 
@@ -67,7 +78,7 @@ public final class Bank {
     }
 
     /** Returns the bank with this id, or null when no bank has it.
-     *  Callers must handle a miss explicitly (message / explicit default) instead of silently switching banks. */
+     *  Callers must handle a miss explicitly instead of silently switching banks. */
     public BankMeta byId(String id) {
         for (BankMeta m : banks) if (m.id.equals(id)) return m;
         return null;
@@ -105,13 +116,13 @@ public final class Bank {
         return (v == null || v.isEmpty() || "null".equals(v)) ? null : v;
     }
 
-    /** Questions for global ids (tests banks only), in the order given. */
+    /** Questions for global ids, in the order given. Unknown gids are skipped, never null. */
     public synchronized List<Question> forIds(int[] gids) {
         java.util.HashMap<Integer,Question> map = new java.util.HashMap<>();
         try { for (BankMeta m : banks) for (Question q : questions(m)) map.put(q.gid, q); }
         catch (Exception e) { throw new RuntimeException(e); }
         List<Question> out = new ArrayList<>();
-        for (int g : gids) { Question q = map.get(g); if (q != null) out.add(q); } // a missing gid is skipped, never null
+        for (int g : gids) { Question q = map.get(g); if (q != null) out.add(q); }
         return out;
     }
 

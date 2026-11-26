@@ -1,15 +1,12 @@
 package com.quizhub.app;
 
 import android.app.Activity;
-import android.app.Dialog;
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -17,30 +14,29 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.List;
 
+/**
+ * Clean rebuild of the Quiz Hub shell. One design only (round 5, ivory +
+ * gold + deep-teal dark mode), plain Java, no libraries. The app is Arabic
+ * RTL throughout; English question/option text renders LTR; numbers and
+ * times are bidi-isolated. No old bottom tab bar, no old theme switcher.
+ */
 public class MainActivity extends Activity {
     Theme theme = new Theme();
     Bank bank;
     Session s;
 
     FrameLayout root;
-    LinearLayout screen;      // the rounded card column: header / scroll / tabbar
+    LinearLayout screen;      // the rounded card column: header / scroll
     LinearLayout header;
     ScrollView scroll;
     android.widget.EditText homeSearch; // home search box, for the drawer "بحث" item to focus
     LinearLayout content;     // inside scroll
-    FrameLayout tabbarWrap;
-    TabBarBgView tabbarBg;
-    View[] tabBtns = new View[3];
-    ImageView[] tabIcons = new ImageView[3];
-    TextView[] tabLabels = new TextView[3];
     LinearLayout timerChip;
     TextView timerChipLabel;
     TextView timerChipTime;
-    ImageView timerChipIcon; // Round 5: clock icon in the redesigned timer pill
-    TextView stickyYear; // Round 5 (#16): sticky year header overlay (new design only)
-    java.util.List<Integer> quizView; int quizPos; // Round 5 (#20): swipe navigation reads these (set by Screens.quiz)
-    /** Side navigation drawer (replaces the old header "› القائمة" button):
-     *  overlay children of root, like the side rails. Transient (not saved). */
+    ImageView timerChipIcon; // clock icon in the redesigned timer pill
+    TextView stickyYear; // sticky year header overlay (home only)
+    java.util.List<Integer> quizView; int quizPos; // swipe navigation reads these (set by Screens.quiz)
     boolean drawerOpen = false;
     View drawerScrim;
     LinearLayout drawerPanel;
@@ -63,29 +59,18 @@ public class MainActivity extends Activity {
 
     String review = "all";        // all | wrong
     String confirmAction = null;  // finish | start | null
-    Boolean setupOpen = null;     // null = auto (!started), like web <details open={!started}>
+    Boolean setupOpen = null;     // null = auto (!started)
     boolean trOpen=false, hintOpen=false;
     Integer pending = null;
-    /** Suggestion 34: focus mode — hides the timer, badges and chrome on the
-     *  quiz screen, leaving only the question + options. Transient (not saved). */
-    boolean focus = false;
-    /** Suggestion 33: double-tap detection for options — last tap position + time. */
-    long lastOptTapAt = 0; int lastOptTapIdx = -1;
-    /** S2-1: a pending (unconfirmed) choice kept per question position, so navigating away and back does not lose it. */
+    boolean focus = false;        // focus mode: only the question + options (transient)
+    long lastOptTapAt = 0; int lastOptTapIdx = -1; // double-tap-to-confirm tracking
     java.util.HashMap<Integer,Integer> pendingByQuestion = new java.util.HashMap<>();
-    /** S3-2: only scroll to top when the view identity actually changed (tab/question/review/confirm), not on every settings toggle. */
     String lastScrollSig = "";
-    /** S3-10: info panels collapsed state (exam panel open by default). */
     boolean infoExamOpen = true;
-    /** S4-5: current search text in the in-page bank picker. */
     String bankQuery = "";
 
     List<Bank.Question> qs;       // current session bank questions (session order)
     Bank.BankMeta currentBank;
-
-    static final String[] TAB_NAMES = {"الرئيسية","الأسئلة","الإعدادات"};
-    static final int[] TAB_ICONS = {R.drawable.ic_home, R.drawable.ic_list, R.drawable.ic_gear};
-    static final float[] NOTCH = {0.8333f, 0.5f, 0.1666f}; // home, quiz, settings (RTL layout)
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -105,13 +90,24 @@ public class MainActivity extends Activity {
         root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL); // the whole app is Arabic RTL
         root.setBackgroundColor(theme.rootBg());
         setContentView(root);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            // Edge-to-edge (target SDK 35): pad the root by the system-bar insets
+            // so the margined card never hides behind the status/navigation bars.
+            // The insets are passed on unconsumed; children do not re-apply them.
+            try {
+                root.setOnApplyWindowInsetsListener((v, insets) -> {
+                    android.graphics.Insets sb = insets.getInsets(android.view.WindowInsets.Type.systemBars());
+                    v.setPadding(sb.left, sb.top, sb.right, sb.bottom);
+                    return insets;
+                });
+            } catch (Exception ignore) {}
+        }
         buildScreen();
         renderAll();
         startTicker();
         if (s.notice != null) { android.widget.Toast.makeText(this, s.notice, android.widget.Toast.LENGTH_LONG).show(); s.notice = null; save(); }
     }
 
-    /** S3-3: rotation / process recreation keeps transient UI state that is not in Session (pending answers, open panels/dialogs). */
     @Override protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
         out.putInt("pending", pending == null ? -1 : pending);
@@ -150,15 +146,13 @@ public class MainActivity extends Activity {
         bankQuery = b.getString("bankQuery", "");
     }
 
-    /** Round 4: the brand logo is decoded from assets once per theme and cached —
-     *  refreshHeader() used to decode the PNG on every single renderAll(). */
     android.graphics.Bitmap logoCache;
     boolean logoCacheDark;
     android.graphics.Bitmap logoBitmap() {
         if (logoCache != null && logoCacheDark == theme.dark) return logoCache;
         try {
             logoCache = android.graphics.BitmapFactory.decodeStream(getAssets().open(
-                theme.dark ? "branding/quiz-hub-mark-lime.png" : "branding/quiz-hub-mark.png"));
+                theme.dark ? "branding/quiz-hub-mark-gold.png" : "branding/quiz-hub-mark.png"));
             logoCacheDark = theme.dark;
         } catch (Exception ignore) { logoCache = null; }
         return logoCache;
@@ -166,7 +160,21 @@ public class MainActivity extends Activity {
     void applyFrame() {
         getWindow().setStatusBarColor(theme.rootBg());
         getWindow().setNavigationBarColor(theme.rootBg());
-        if (theme.dark) {
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            // Target SDK 35 enforces edge-to-edge: the window extends behind the
+            // system bars, so stop the automatic inset here and let the root view
+            // pad itself from the real bar insets (see onCreate). The bars keep
+            // the app background color, so they still blend in.
+            try {
+                getWindow().setDecorFitsSystemWindows(false);
+                android.view.WindowInsetsController c = getWindow().getInsetsController();
+                if (c != null) {
+                    int mask = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                    c.setSystemBarsAppearance(theme.dark ? 0 : mask, mask);
+                }
+            } catch (Exception ignore) {}
+        } else if (theme.dark) {
             getWindow().getDecorView().setSystemUiVisibility(0);
         } else {
             int f = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
@@ -188,7 +196,7 @@ public class MainActivity extends Activity {
         screen.setBackground(Ui.round(theme.bg(), Ui.dp(this, 28)));
         root.addView(screen);
 
-        // header (48dp compact)
+        // header (48dp compact): hamburger + brand + timer pill only
         header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -203,9 +211,9 @@ public class MainActivity extends Activity {
         scroll.addView(content);
         LinearLayout.LayoutParams scr = new LinearLayout.LayoutParams(-1, 0, 1f);
         screen.addView(scroll, scr);
-        // Round 5 (#20): swipe between questions on the quiz screen (new design
-        // only). The listener never consumes the event, so vertical scrolling
-        // still works; only a clear horizontal fling navigates.
+        // Swipe between questions on the quiz screen. The listener never
+        // consumes the event, so vertical scrolling still works; only a
+        // clear horizontal fling navigates.
         final android.view.GestureDetector gd = new android.view.GestureDetector(this, new android.view.GestureDetector.SimpleOnGestureListener() {
             @Override public boolean onFling(android.view.MotionEvent e1, android.view.MotionEvent e2, float vx, float vy) {
                 if (e1 == null || e2 == null) return false;
@@ -223,46 +231,7 @@ public class MainActivity extends Activity {
             return false;
         });
 
-        // tabbar 60dp with raised icons
-        tabbarWrap = new FrameLayout(this);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, Ui.dp(this, 76));
-        tp.setMargins(Ui.dp(this,14), Ui.dp(this,2), Ui.dp(this,14), Ui.dp(this,8));
-        screen.addView(tabbarWrap, tp);
-        tabbarWrap.setClipChildren(false);
-        tabbarWrap.setClipToPadding(false);
-        tabbarBg = new TabBarBgView(this, theme);
-        tabbarWrap.addView(tabbarBg, new FrameLayout.LayoutParams(-1, Ui.dp(this,60), Gravity.BOTTOM));
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setClipChildren(false);
-        tabs.setClipToPadding(false);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(-1, Ui.dp(this,60), Gravity.BOTTOM);
-        tabbarWrap.addView(tabs, tlp);
-        for (int i = 0; i < 3; i++) {
-            final int idx = i;
-            FrameLayout cell = new FrameLayout(this);
-            cell.setClipChildren(false);
-            cell.setClipToPadding(false);
-            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, -1, 1f);
-            cell.setLayoutParams(cp);
-            ImageView icon = new ImageView(this);
-            icon.setImageResource(TAB_ICONS[i]);
-            FrameLayout.LayoutParams ip = new FrameLayout.LayoutParams(Ui.dp(this,40), Ui.dp(this,40), Gravity.TOP|Gravity.CENTER_HORIZONTAL);
-            ip.topMargin = Ui.dp(this,10);
-            icon.setLayoutParams(ip);
-            icon.setPadding(Ui.dp(this,9),Ui.dp(this,9),Ui.dp(this,9),Ui.dp(this,9));
-            TextView label = Ui.tv(this, TAB_NAMES[i], 12, theme.disp(), theme.tabText());
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
-            lp.bottomMargin = Ui.dp(this,7);
-            label.setLayoutParams(lp);
-            cell.addView(icon); cell.addView(label);
-            cell.setOnClickListener(v -> onTab(idx));
-            tabs.addView(cell);
-            tabBtns[i]=cell; tabIcons[i]=icon; tabLabels[i]=label;
-        }
-        // Round 5 (#16): sticky year header — a fixed overlay at the top of the
-        // scroll area, mirroring the year header scrolling under it (new design
-        // only; Screens.updateStickyYear drives its text/visibility).
+        // Sticky year header — a fixed overlay at the top of the scroll area.
         stickyYear = new TextView(this);
         stickyYear.setTextSize(14);
         stickyYear.setTypeface(theme.dispB());
@@ -271,8 +240,8 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams syp = new FrameLayout.LayoutParams(-1, -2);
         syp.setMargins(Ui.dp(this,22), Ui.dp(this,56), Ui.dp(this,22), 0);
         root.addView(stickyYear, syp);
-        // Side navigation drawer: a scrim (tap to close) + a slide-in panel on
-        // the start (right) side. renderAll() drives visibility + content.
+
+        // Side navigation drawer: a scrim (tap to close) + a slide-in panel on the start (right) side.
         drawerScrim = new View(this);
         drawerScrim.setBackgroundColor(android.graphics.Color.argb(115, 7, 46, 43));
         drawerScrim.setOnClickListener(v -> closeDrawer());
@@ -295,38 +264,10 @@ public class MainActivity extends Activity {
         drawerPanel.setVisibility(View.GONE);
     }
 
-    void onTab(int i) {
-        confirmAction = null;
-        if (i == 0) { goToList(); }
-        else if (i == 1) { openReview("all"); }
-        else { s.tab = "settings"; save(); renderAll(); }
-    }
-
-    void refreshTabbar() {
-        int active = s.tab.equals("home") ? 0 : s.tab.equals("quiz") ? 1 : 2;
-        tabbarBg.setNotch(NOTCH[active]);
-        for (int i = 0; i < 3; i++) {
-            boolean on = i == active;
-            tabIcons[i].setTranslationY(on ? -Ui.dp(this, 26) : 0);
-            GradientDrawable circle = new GradientDrawable();
-            circle.setShape(GradientDrawable.OVAL);
-            if (on) {
-                circle.setColor(theme.dark ? Theme.D_SOFT : Theme.L_TEAL);
-                circle.setStroke(Ui.dp(this,4), theme.bg());
-            } else {
-                circle.setColor(Color.TRANSPARENT);
-            }
-            tabIcons[i].setBackground(circle);
-            tabIcons[i].setColorFilter(on ? (theme.dark ? Theme.D_BG : Theme.L_BG) : theme.tabText());
-            tabLabels[i].setTextColor(on ? theme.ink() : theme.tabText());
-        }
-    }
-
     void refreshHeader() {
         header.removeAllViews();
         boolean solving = s.tab.equals("quiz") && s.started;
-        // Side navigation drawer (replaces the old "› القائمة" header button):
-        // a hamburger that opens the slide-in menu. Hidden in focus mode.
+        // Hamburger opens the side navigation drawer. Hidden in focus mode.
         if (!focus) {
             android.widget.ImageView menu = new android.widget.ImageView(this);
             menu.setImageResource(R.drawable.ic_menu);
@@ -339,8 +280,7 @@ public class MainActivity extends Activity {
             mp2.setMarginEnd(Ui.dp(this, 12));
             header.addView(menu, mp2);
         }
-        // brand: mark + name, LTR (the "أسئلة مزاولة المهنة" subtitle was
-        // dropped from the header — it crowded the row with the hamburger)
+        // brand: mark + name, LTR
         LinearLayout brand = new LinearLayout(this);
         brand.setOrientation(LinearLayout.HORIZONTAL);
         brand.setGravity(Gravity.CENTER_VERTICAL);
@@ -348,8 +288,7 @@ public class MainActivity extends Activity {
         ImageView mark = new ImageView(this);
         android.graphics.Bitmap logo = logoBitmap();
         if (logo != null) mark.setImageBitmap(logo);
-        // Round 5: logo scale + fade-in on launch (once — the header is rebuilt
-        // on every render, so only the first build animates).
+        // Logo scale + fade-in on launch (once — the header is rebuilt on every render).
         if (!logoSplashDone) { logoSplashDone = true; Fx.splash(this, mark); }
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(
             solving ? Ui.dp(this,27) : Ui.dp(this,34), solving ? Ui.dp(this,24) : Ui.dp(this,28));
@@ -357,18 +296,17 @@ public class MainActivity extends Activity {
         TextView name = Ui.tv(this, "Quiz Hub", 18, theme.dispB(), theme.ink());
         name.setPadding(Ui.dp(this,7),0,0,0);
         brand.addView(name);
-        if (solving) brand.setGravity(Gravity.CENTER_VERTICAL | Gravity.START); // RTL start = right side, next to the back button
+        if (solving) brand.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         header.addView(brand, new LinearLayout.LayoutParams(0, -1, 1f));
         if (solving && !focus && s.timer) {
             View tc = makeTimerChip();
-            if (timerChipLabel != null) timerChipLabel.setVisibility(View.GONE); // web: .qz-is-solving .qz-timer-label {display:none}
+            if (timerChipLabel != null) timerChipLabel.setVisibility(View.GONE);
             LinearLayout.LayoutParams tcp = new LinearLayout.LayoutParams(-2, -2);
             tcp.setMarginEnd(Ui.dp(this, 8));
             header.addView(tc, tcp);
         }
     }
 
-    /** Round 5: the logo splash runs once per launch. */
     boolean logoSplashDone = false;
 
     View makeTimerChip() {
@@ -379,13 +317,12 @@ public class MainActivity extends Activity {
         chip.setGravity(Gravity.CENTER_VERTICAL);
         timerChipLabel = Ui.tv(this, cd?"باقي":"الوقت", 11, theme.disp(), theme.ink());
         timerChipTime = Ui.timeView(this, val, 13, theme.dispB(), theme.ink());
-        // Round 5 (feedback): a designed pill — small clock icon + tabular
-        // numbers in gold; calm red in the last 5 minutes of a countdown.
+        // Clean pill: small clock icon + tabular numbers in gold; calm red in the last 5 minutes of a countdown.
         chip.setPadding(Ui.dp(this,12), Ui.dp(this,6), Ui.dp(this,12), Ui.dp(this,6));
         timerChipIcon = new android.widget.ImageView(this);
         timerChipIcon.setImageResource(R.drawable.ic_clock);
         timerChipIcon.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        chip.addView(timerChipIcon, new LinearLayout.LayoutParams(Ui.dp(this,16), Ui.dp(this,16))); // RTL: icon at the start (right), time to its left
+        chip.addView(timerChipIcon, new LinearLayout.LayoutParams(Ui.dp(this,16), Ui.dp(this,16)));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.setMarginStart(Ui.dp(this,6));
         chip.addView(timerChipLabel, lp);
@@ -397,10 +334,7 @@ public class MainActivity extends Activity {
         return chip;
     }
 
-    /** Round 5: in the new design the timer is gold normally and calm red in
-     *  the last 5 minutes of a countdown (icon + label + time + pill border
-     *  all follow the same color). The time itself stays LTR-isolated via
-     *  Ui.timeView (LRE..PDF + TEXT_DIRECTION_LTR). */
+    /** Timer pill color: gold normally, calm red in the last 5 minutes of a countdown. */
     void colorTimerChip() {
         if (timerChip == null) return;
         boolean low = s.countdown && s.remaining() <= 300;
@@ -413,8 +347,6 @@ public class MainActivity extends Activity {
     }
 
     // ---------------- timer ----------------
-    // The ticker only runs while a quiz is being solved. When it is not running
-    // it stops re-posting (no idle ticking); startTicker() restarts it on resume/begin.
     void startTicker() {
         if (tickerScheduled || s == null) return;
         tickerScheduled = true;
@@ -425,12 +357,12 @@ public class MainActivity extends Activity {
                         && !s.paused && !s.expired() && !(s.quizOnly && !s.tab.equals("quiz"));
                 if (!running) { tickerScheduled = false; return; }
                 s.elapsed++;
-                if (s.elapsed % 10 == 0) save(); // onPause saves too; was every second
+                if (s.elapsed % 10 == 0) save(); // onPause saves too
                 if (timerChip != null && s.timer) {
                     int val = s.countdown ? s.remaining() : s.elapsed;
                     timerChipLabel.setText(s.countdown?"باقي":"الوقت");
                     timerChipTime.setText(Ui.lre(Ui.formatTime(val)));
-                    colorTimerChip(); // Round 5: calm red in the last 5 minutes
+                    colorTimerChip();
                 }
                 if (s.expired()) renderAll(); // lock answers the moment it hits zero
                 handler.postDelayed(ticker, 1000);
@@ -439,16 +371,12 @@ public class MainActivity extends Activity {
         handler.postDelayed(ticker, 1000);
     }
 
-    // ---------------- actions (ports of App.tsx) ----------------
+    // ---------------- actions ----------------
     boolean celebrate = false;
     String pendingRunKind = null; int[] pendingRunIds = null;
     void ensureQs() {
         if (qs != null || bankLoadFailed) return;
-        // S1-2: a corrupt bank file must show the error view, not crash out of the render.
-        if (!s.run.equals("all")) { try { qs = bank.forIds(s.ids); } catch (Exception e) { showBankError(e); } }
-        // Suggestion 36: a shuffled run stores its order in ids[] — questions
-        // must load in that order, not the bank's canonical order.
-        else if (s.shuffled) { try { qs = bank.forIds(s.ids); } catch (Exception e) { showBankError(e); } }
+        if (!s.run.equals("all") || s.shuffled) { try { qs = bank.forIds(s.ids); } catch (Exception e) { showBankError(e); } }
         else loadBank(sessionBank());
     }
     void startRun(String kind, int[] ids) {
@@ -483,22 +411,20 @@ public class MainActivity extends Activity {
     void begin() {
         Bank.BankMeta b = bank.byId(s.setupSection);
         if (b == null) {
-            android.widget.Toast.makeText(this, "البنك المحفوظ مش موجود في النسخة دي، فبدأنا من أول بنك.", android.widget.Toast.LENGTH_LONG).show();
-            b = bank.banks.get(0);
+            android.widget.Toast.makeText(this, "البنك المحفوظ مش موجود في النسخة دي، فبدأنا من أحدث امتحان.", android.widget.Toast.LENGTH_LONG).show();
+            b = bank.defaultBank();
             s.setupSection = b.id;
         }
         if (pendingRunKind != null) {
-            // S1-1: bankKey stays a real bank id (the setup bank); the run kind lives in run only.
-            // Storing "notebook"/"flagged" in bankKey used to make sanitize() wipe the session on next launch.
+            // bankKey stays a real bank id (the setup bank); the run kind lives in run only.
             s.run = pendingRunKind; s.bankKey = b.id; s.ids = pendingRunIds.clone();
             pendingRunKind = null; pendingRunIds = null;
             s.shuffled = false; // notebook/flagged runs keep their own order
             try { qs = bank.forIds(s.ids); } catch (Exception e) { showBankError(e); return; }
         } else {
             s.run = "all"; s.bankKey = b.id; s.ids = b.ids.clone();
-            // Suggestion 36: shuffle the order for a fresh exam when the bank
-            // has shuffle on. The shuffled order is saved with the run (ids[]),
-            // so resume, the progress bar and the result all follow it.
+            // Shuffle the order for a fresh exam when the bank has shuffle on (default off).
+            // The shuffled order is saved with the run (ids[]), so resume, progress and result follow it.
             s.shuffled = s.shuffleBanks.contains(b.id);
             if (s.shuffled) {
                 java.util.List<Integer> l = new java.util.ArrayList<>();
@@ -517,7 +443,6 @@ public class MainActivity extends Activity {
         if (qs == null) loadBank(b);
         save(); renderAll(); startTicker();
     }
-    /** Phase 1: always ask before finishing — even with no blank questions — so a stray tap cannot end the attempt. */
     void finishQuiz() {
         confirmAction = "finish"; renderAll();
     }
@@ -534,9 +459,7 @@ public class MainActivity extends Activity {
         setupOpen = null;
         save(); renderAll();
     }
-    /** S3-1: leaving the result screen must not wipe it; a new attempt only starts when the user explicitly begins one (setup "ابدأ تجربة" -> begin()). */
-    /** Round 5 (#20): swipe navigation between questions. dir +1 = next (swipe
-     *  left in RTL), -1 = previous. Same state changes as the Previous/Next buttons. */
+    /** Swipe navigation between questions. dir +1 = next (swipe left in RTL), -1 = previous. */
     void swipeQuiz(int dir) {
         if (quizView == null || quizView.isEmpty()) return;
         int np = quizPos + dir;
@@ -544,8 +467,7 @@ public class MainActivity extends Activity {
         s.index = quizView.get(np); trReset(); save(); renderAll();
     }
 
-    /** Side navigation drawer: data-driven rows (label + action) so more items
-     *  can be added later without touching the drawer chrome. */
+    /** Side navigation drawer: data-driven rows (label + action). */
     void openDrawer() {
         drawerOpen = true;
         refreshDrawer();
@@ -601,11 +523,10 @@ public class MainActivity extends Activity {
         });
         drawerItem("الإعدادات", true, () -> { drawerOpen = false; s.tab = "settings"; save(); renderAll(); });
         if (s.started && !s.submitted) drawerItem("الرجوع للقائمة", true, () -> { drawerOpen = false; goToList(); });
-        // Dark-mode toggle pinned at the bottom.
+        // Font-size toggle + dark-mode toggle pinned at the bottom.
         View spacer = new View(this);
         drawerPanel.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
         Screens.groupTitle(this, drawerPanel, "المظهر");
-        // Font-size toggle (moved out of the quiz screen so the top bar stays clean).
         LinearLayout fontRow = new LinearLayout(this);
         fontRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView fl = Ui.tv(this, "حجم الخط", 15, theme.disp(), theme.ink());
@@ -677,26 +598,30 @@ public class MainActivity extends Activity {
 
     void goHome() {
         confirmAction = null;
-        focus = false; // Suggestion 34: leaving the quiz exits focus mode
+        focus = false; // leaving the quiz exits focus mode
         s.tab = "home"; save(); renderAll();
     }
-    /** Round 4: back to the exam list from a quiz — pauses the exam so the clock
-     *  stops (going home used to leave it ticking), and opens the exam list
-     *  immediately instead of leaving it collapsed behind "تجربة جديدة". */
+    /** Back to home from review/result: land on the exam list. The saved
+     *  result stays (scroll up to see it) — same scroll as the result
+     *  screen's own button. */
+    void goHomeToList() {
+        goHome();
+        scrollHomeToList();
+    }
+    /** Back to the exam list from a quiz — pauses the exam so the clock stops. */
     void goToList() {
         if (s.started && !s.submitted) s.paused = true;
         setupOpen = true;
         goHome();
     }
-    /** Round 4: tapping an exam card starts that exam in the chosen mode — or
-     *  resumes it when it is the live session. A live session for another exam
-     *  asks for confirmation first (confirmBox -> begin()). */
+    /** Tapping an exam card starts that exam in the chosen mode — or resumes
+     *  it when it is the live session. A live session for another exam asks
+     *  for confirmation first (confirmBox -> begin()). */
     void onExamCard(Bank.BankMeta m) {
         if (s.started && !s.submitted && s.run.equals("all") && m.id.equals(s.bankKey)) { openReview("all"); return; }
         s.setupSection = m.id; s.minutes = m.minutes; save();
         if (s.started) { confirmAction = "start"; renderAll(); } else begin();
     }
-    /** S3-6: restore the progress that was live before the last backup restore. */
     void undoLastRestore() {
         if (!Session.undoRestore(this)) { android.widget.Toast.makeText(this, "مفيش استرجاع سابق للتراجع عنه.", android.widget.Toast.LENGTH_SHORT).show(); return; }
         s = Session.load(this, bank);
@@ -707,11 +632,9 @@ public class MainActivity extends Activity {
     }
     void openReview(String filter) {
         review = filter;
-        // Round 4: "كمّل الحل" means resume — unpause a live session, or the quiz
-        // would reopen with a stopped clock and no visible way to restart it.
+        // "كمّل الحل" means resume — unpause a live session.
         if (s.started && !s.submitted) s.paused = false;
         if (filter.equals("wrong")) {
-            // ensure index points at a wrong answer
             if (!(s.picked[s.index] >= 0 && s.picked[s.index] != qs.get(s.index).c)) {
                 for (int i = 0; i < s.ids.length; i++)
                     if (s.picked[i] >= 0 && s.picked[i] != qs.get(i).c) { s.index = i; break; }
@@ -725,18 +648,18 @@ public class MainActivity extends Activity {
         int chosen = s.picked[s.index];
         if (s.mode.equals("study") && chosen >= 0 && !(s.retry && chosen != q.c)) return;
         s.picked[s.index] = v;
-        // web parity: in study mode the mistakes notebook updates right at the answer, not only at submit
+        // In study mode the mistakes notebook updates right at the answer, not only at submit.
         if (s.mode.equals("study")) { if (v == q.c) { if (s.run.equals("notebook")) s.wrong.remove(q.gid); } else s.wrong.add(q.gid); }
         save();
-        // Answer sounds (round-4 chunk 1 wired the sfx files; the study-only
-        // gate below used to silence them in exam mode): the correct/wrong
-        // blip plays whenever an answer is committed, in BOTH modes, when
-        // sounds are on. Vibration mirrors it — short buzz for correct, double
-        // buzz for wrong — gated on the fx/calm haptics setting. Both are
-        // fire-and-forget and never delay the explanation card.
-        if (s.sounds) ClipPlayer.sfx(this, v == q.c, s.volume);
-        Fx.resultBuzz(this, v == q.c);
-        Fx.buzz(this); // Round 5: gentle haptic on selecting an answer (and on confirm, via commit -> pick)
+        // Answer sounds + result vibration are STUDY-mode only: in exam mode the
+        // answer must not leak through a correct/wrong blip or a distinct buzz.
+        // (The gentle select haptic below is the same for correct/wrong in both modes.)
+        // Neither delays the explanation card.
+        if (s.mode.equals("study")) {
+            if (s.sounds) ClipPlayer.sfx(this, v == q.c, s.volume);
+            Fx.resultBuzz(this, v == q.c);
+        }
+        Fx.buzz(this); // gentle haptic on selecting an answer
         // auto-advance after 2s
         if (autoNextRun != null) handler.removeCallbacks(autoNextRun);
         if (s.autoNext && !(s.mode.equals("study") && s.autoExplain) && !s.submitted
@@ -749,7 +672,7 @@ public class MainActivity extends Activity {
         if (s.mode.equals("study") && v == q.c) Fx.confetti(this, false);
     }
     boolean popOnce = false, confettiDone = false; String lastSig = "";
-    /** commit = pick + optional auto-explain (port of web commit) */
+    /** commit = pick + optional auto-explain */
     void commit(int v) {
         pick(v);
         pending = null;
@@ -757,8 +680,7 @@ public class MainActivity extends Activity {
         if (s.autoExplain && s.mode.equals("study") && !s.submitted) Screens.showExplain(this);
     }
 
-    /** Suggestion 35: share the current question as a designed image (question
-     *  + answer + explanation, brand style) via the system share sheet. */
+    /** Share the current question as a designed image via the system share sheet. */
     void shareQuestion() {
         if (qs == null || s.index < 0 || s.index >= qs.size()) return;
         String examName = s.run.equals("all") ? (sessionBank() != null ? sessionBank().name : null) : runLabel(s.run);
@@ -767,7 +689,6 @@ public class MainActivity extends Activity {
 
     void trReset() {
         trOpen = s.translation; hintOpen = s.hintDefault;
-        // S2-1: a pending (unconfirmed) choice is kept per question instead of being thrown away on every navigation.
         pending = pendingByQuestion.get(s.index);
     }
 
@@ -782,7 +703,7 @@ public class MainActivity extends Activity {
                 if (m.ids.length == s.ids.length && m.ids[0] == s.ids[0]) return m;
         }
         Bank.BankMeta b = bank.byId(s.setupSection);
-        return b != null ? b : bank.banks.get(0); // explicit default: first bank in index order
+        return b != null ? b : bank.defaultBank(); // explicit default: the newest exam
     }
 
     void save() { s.save(this); }
@@ -793,11 +714,9 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(theme.rootBg());
         screen.setBackground(Ui.round(theme.bg(), Ui.dp(this, 28)));
         applyFrame();
-        tabbarBg.applyTheme();
         refreshHeader();
-        refreshTabbar();
-        if (stickyYear != null && !s.tab.equals("home")) stickyYear.setVisibility(View.GONE); // Round 5 (#16): sticky year header lives on home only
-        // S3-2: a settings toggle re-renders the same view, so it must not jump to the top.
+        if (stickyYear != null && !s.tab.equals("home")) stickyYear.setVisibility(View.GONE);
+        // A settings toggle re-renders the same view, so it must not jump to the top.
         String scrollSig = s.tab + "|" + s.index + "|" + review + "|" + confirmAction;
         if (!scrollSig.equals(lastScrollSig)) { lastScrollSig = scrollSig; scroll.scrollTo(0, 0); }
         content.removeAllViews();
@@ -811,8 +730,7 @@ public class MainActivity extends Activity {
         else Screens.settings(this, content);
         String sig = s.tab + "|" + s.index + "|" + s.submitted + "|" + (s.started ? 1 : 0) + "|" + review + "|" + confirmAction;
         if (!sig.equals(lastSig)) { boolean first = lastSig.isEmpty(); lastSig = sig; if (!first) Fx.rise(this, content); }
-        // Side navigation drawer — visibility follows the flag; content is
-        // refreshed while open so counts/theme stay current.
+        // Side navigation drawer — visibility follows the flag; content is refreshed while open.
         if (drawerScrim != null) drawerScrim.setVisibility(drawerOpen ? View.VISIBLE : View.GONE);
         if (drawerPanel != null) {
             drawerPanel.setVisibility(drawerOpen ? View.VISIBLE : View.GONE);
@@ -821,8 +739,7 @@ public class MainActivity extends Activity {
     }
 
     @Override public void onBackPressed() {
-        // Side drawer closes first; otherwise system Back from a quiz pauses
-        // the exam (same as "الرجوع للقائمة").
+        // Side drawer closes first; otherwise system Back from a quiz pauses the exam.
         if (drawerOpen) { closeDrawer(); return; }
         if (!s.tab.equals("home")) { goToList(); }
         else super.onBackPressed();

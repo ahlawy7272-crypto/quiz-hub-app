@@ -7,9 +7,8 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.View;
 
-/** Round 5: tiny animated equalizer shown while explanation audio is playing
- *  (next to the audio chip, and inside the big explanation-audio button).
- *  When the animation is not running it draws static mid-height bars. */
+/** Animated equalizer shown while explanation audio is playing.
+ *  When not running it draws static mid-height bars. */
 public final class WaveView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private ValueAnimator anim;

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="QuizHubTheme" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@android:color/white</item>
-        <item name="android:statusBarColor">#e4f5a4</item>
+        <item name="android:windowBackground">#F5F3EE</item>
+        <item name="android:statusBarColor">#F5F3EE</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">#e4f5a4</item>
+        <item name="android:navigationBarColor">#F5F3EE</item>
     </style>
 </resources>

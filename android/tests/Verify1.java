@@ -40,7 +40,7 @@ public class Verify1 {
         assertEquals("the untouched old state must be kept", rawBefore, p.getString("state_legacy_backup", null));
         assertNotNull("a notice must tell the user the old state was not converted", s.notice);
         // nothing is mapped by identity: fresh start, no ids or answers carried over
-        assertEquals(a.bank.banks.get(0).ids.length, s.ids.length);
+        assertEquals(a.bank.defaultBank().ids.length, s.ids.length);
         for (int v : s.picked) assertEquals(-1, v);
         assertTrue(s.favorites.isEmpty() && s.wrong.isEmpty());
         assertTrue(a.bank.has(s.bankKey) && a.bank.has(s.setupSection));
