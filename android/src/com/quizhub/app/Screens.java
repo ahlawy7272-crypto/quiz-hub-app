@@ -20,10 +20,12 @@ import java.util.List;
  * The agreed design only — soft ivory, gold accents, deep-teal dark mode.
  * No praise words after answering (green/red colors only), no explanatory
  * captions inside screens, no verification wording or statistics in the UI.
- * R5/R7 items pending Mohamed's decision are preserved EXACTLY as in the
- * current build: the settings detail paragraphs + intro, and the source line
- * + generated-audio note inside the explanation dialog (see showExplain /
- * addAudio below). Nothing else was kept from the old screens.
+ * R5 + R7 (source line) items pending Mohamed's decision are preserved
+ * EXACTLY as in the current build: the settings detail paragraphs + intro,
+ * and the source line inside the explanation dialog (see showExplain
+ * below). The generated-audio note was removed 2026-11-26 per his decision
+ * (R7 part 1); both clips now use the same audio button label.
+ * Nothing else was kept from the old screens.
  */
 final class Screens {
 
@@ -898,10 +900,10 @@ final class Screens {
     }
 
     // ================= explain dialog =================
-    // R7 — PENDING MOHAMED'S DECISION, preserved exactly as in the current
-    // build: the source line below ("المصدر: …") and the generated-audio
-    // caption in addAudio ("شرح صوتي إضافي مولّد (مش تسجيل الدكتور)").
-    // Do not remove, do not add more, until he decides.
+    // R7 — part 1 DECIDED 2026-11-26 by Mohamed: the generated-audio note
+    // is removed; both clips use the same audio button label. The source
+    // line below ("المصدر: …") is preserved — R7's other half, still
+    // pending his decision.
     static void showExplain(MainActivity a) {
         Session s = a.s; Theme t = a.theme;
         Bank.Question q = a.qs.get(s.index);
@@ -939,7 +941,7 @@ final class Screens {
             });
         }
         addAudio(a, box, q, "r" + q.gid + ".mp3", "تسجيل الدكتور");
-        addAudio(a, box, q, "g" + q.gid + ".mp3", "شرح صوتي إضافي مولّد (مش تسجيل الدكتور)");
+        addAudio(a, box, q, "g" + q.gid + ".mp3", "تسجيل الدكتور");
         d.setOnDismissListener(x -> ClipPlayer.stop());
         Button close = btn(a, "قفل الشرح", false);
         close.setOnClickListener(v -> d.dismiss());
