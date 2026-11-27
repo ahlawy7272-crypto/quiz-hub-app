@@ -107,9 +107,18 @@ public final class Session {
             bankKey = bank.has(setupSection) ? setupSection : bank.defaultBank().id;
         }
         boolean bad = !bank.has(bankKey) || !bank.has(setupSection);
-        for (int id : ids) if (id < 0 || id >= total) bad = true;
-        for (int g : favorites) if (g < 0 || g >= total) bad = true;
-        for (int g : wrong) if (g < 0 || g >= total) bad = true;
+        // One bad id is dropped, not a reason to wipe the session: drop
+        // out-of-range run positions (keeping picked[] aligned with ids[])
+        // and out-of-range notebook entries, and keep everything else.
+        int kept = 0;
+        for (int i = 0; i < ids.length; i++) if (ids[i] >= 0 && ids[i] < total) kept++;
+        if (kept != ids.length) {
+            int[] nIds = new int[kept]; int[] nPicked = new int[kept]; int k = 0;
+            for (int i = 0; i < ids.length; i++) if (ids[i] >= 0 && ids[i] < total) { nIds[k] = ids[i]; nPicked[k] = picked[i]; k++; }
+            ids = nIds; picked = nPicked;
+        }
+        favorites.removeIf(g -> g < 0 || g >= total);
+        wrong.removeIf(g -> g < 0 || g >= total);
         if (ids.length == 0) bad = true;
         if (!bad) { index = Math.min(Math.max(index, 0), ids.length - 1); return; }
         ids = bank.defaultBank().ids.clone(); picked = new int[ids.length]; java.util.Arrays.fill(picked, -1);

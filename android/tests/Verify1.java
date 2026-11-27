@@ -158,6 +158,39 @@ public class Verify1 {
         assertNull("a single bad answer must not trigger a whole-session reset", s.notice);
     }
 
+    /** One bad gid in favorites/wrong/ids must be dropped, not wipe the notebook, history or answers. */
+    @Test public void singleBadIdIsDroppedNotWiped() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.s.setupSection = "6"; a.begin(); a.save();
+        android.content.SharedPreferences p = a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE);
+        JSONObject j = new JSONObject(p.getString("state", null));
+        int n = a.s.ids.length;
+        int gid0 = a.s.ids[0], gid2 = a.s.ids[2];
+        StringBuilder pk = new StringBuilder();
+        for (int i = 0; i < n; i++) pk.append(i == 0 ? '1' : i == 2 ? '2' : '.');
+        j.put("picked", pk.toString());
+        // one bad id in the middle of the run, one bad gid in favorites and in wrong
+        JSONArray ids = j.getJSONArray("ids");
+        ids.put(1, 9999);
+        j.put("ids", ids);
+        j.put("favorites", new JSONArray(new int[]{598, 599, 99999}));
+        j.put("wrong", new JSONArray(new int[]{600, 2500}));
+        JSONObject h = new JSONObject();
+        h.put("t", 1234567890L); h.put("b", "6"); h.put("m", "study"); h.put("r", 5); h.put("n", 10); h.put("s", 42);
+        j.put("history", new JSONArray().put(h));
+        p.edit().putString("state", j.toString()).commit();
+        Session s = Session.load(a, a.bank);
+        assertNull("one bad id must not trigger a whole-session reset", s.notice);
+        assertEquals("the bad run id is dropped, the rest of the run survives", n - 1, s.ids.length);
+        assertEquals(gid0, s.ids[0]);
+        assertEquals("the run keeps its order past the dropped id", gid2, s.ids[1]);
+        assertEquals("the answer before the dropped id survives", 1, s.picked[0]);
+        assertEquals("the answer after the dropped id stays aligned with its question", 2, s.picked[1]);
+        assertEquals(new java.util.HashSet<>(java.util.Arrays.asList(598, 599)), new java.util.HashSet<>(s.favorites));
+        assertEquals(new java.util.HashSet<>(java.util.Collections.singletonList(600)), new java.util.HashSet<>(s.wrong));
+        assertEquals("history survives a single bad id", 1, s.history.length());
+    }
+
     /** A backup code naming a bank that does not exist in this build is refused, state untouched. */
     @Test public void backupRestoreWithUnknownSectionIsRefused() throws Exception {
         MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();

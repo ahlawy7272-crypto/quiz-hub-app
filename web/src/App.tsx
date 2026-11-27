@@ -108,6 +108,36 @@ function TimerPill({ elapsed, countdown = false, low = false }: { elapsed: numbe
     );
 }
 
+/** Focus management for overlay dialogs (drawer, confirm modal): on open,
+ *  move focus to the first control inside, trap Tab within the dialog,
+ *  and return focus to the element that opened it on close. */
+function useDialogFocus(open: boolean, ref: { current: HTMLElement | null }) {
+    const prevRef = useRef<Element | null>(null);
+    useEffect(() => {
+        if (!open) return;
+        const el = ref.current;
+        if (!el) return;
+        prevRef.current = document.activeElement;
+        const focusables = () => Array.from(el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(x => !x.hasAttribute('disabled') && x.getClientRects().length > 0);
+        const first = focusables()[0];
+        if (first) first.focus();
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return;
+            const list = focusables();
+            if (!list.length) return;
+            const firstEl = list[0];
+            const lastEl = list[list.length - 1];
+            if (e.shiftKey && document.activeElement === firstEl) { e.preventDefault(); lastEl.focus(); }
+            else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
+        };
+        el.addEventListener('keydown', onKey);
+        return () => {
+            el.removeEventListener('keydown', onKey);
+            if (prevRef.current instanceof HTMLElement) prevRef.current.focus();
+        };
+    }, [open, ref]);
+}
+
 export type DrawerItem = { id: string; label: string; badge?: string; disabled?: boolean; action: () => void };
 
 /** Side navigation drawer. Slides in from the start (right) side in RTL;
@@ -119,13 +149,15 @@ function Drawer({ open, onClose, items, dark, onDark, fontPct, onFontScale }: {
     fontPct: number; onFontScale: (v: number) => void;
 }) {
     const touchStart = useRef<{ x: number } | null>(null);
+    const drawerRef = useRef<HTMLDivElement>(null);
+    useDialogFocus(open, drawerRef);
     useEffect(() => {
         if (!open) return;
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [open, onClose]);
-    return <div className={'qz-drawer-wrap' + (open ? ' is-open' : '')} aria-hidden={!open}>
+    return <div className={'qz-drawer-wrap' + (open ? ' is-open' : '')} ref={drawerRef} aria-hidden={!open}>
         <div className="qz-drawer-scrim" onClick={onClose} />
         <aside className="qz-drawer" dir="rtl" role="dialog" aria-label="القائمة"
             onTouchStart={e => { touchStart.current = { x: e.changedTouches[0].clientX }; }}
@@ -256,7 +288,7 @@ function QuizView({ state, update, viewIds, jump, pick, expired, finish, review,
             {audioError && <p className="qz-hint" role="status">تعذّر تشغيل الصوت، جرّب تاني.</p>}
             {trOpen && <p className="qz-q-ar" dir="rtl">{q.tr}</p>}
             {mode === 'study' && !submitted && !answered && settings.hints && hintOpen && <p className="qz-hint" dir="rtl">{q.hint}</p>}
-            <div className="qz-options" role="listbox" aria-label="الاختيارات">{q.o.map((opt, i) => {
+            <div className="qz-options" role="group" aria-label="الاختيارات">{q.o.map((opt, i) => {
                 const correct = i === q.c;
                 const selected = i === chosen;
                 const locked = submitted || expired || (mode === 'study' && answered && !(settings.retry && chosen !== q.c));
@@ -264,7 +296,7 @@ function QuizView({ state, update, viewIds, jump, pick, expired, finish, review,
                 if (feedback && (answered || submitted) && correct) cls += ' is-correct';
                 if (feedback && selected && !correct) cls += ' is-wrong';
                 if ((pending === i) || (!feedback && selected)) cls += ' is-pending';
-                return <button type="button" key={i} role="option" className={cls} dir="ltr" disabled={locked} aria-selected={selected || pending === i} onClick={() => { if (settings.confirm) { buzz(); setPending(i); } else commit(i); }} onDoubleClick={() => { if (settings.confirm && pending === i) commit(i); }}>{settings.letters && <span className="qz-letter" dir="ltr">{letters[i]}</span>}<span className="qz-opt-text" dir="ltr">{opt}</span>{feedback && (answered || submitted) && correct && <span className="qz-mark">✓</span>}{feedback && selected && !correct && <span className="qz-mark">✕</span>}</button>;
+                return <button type="button" key={i} className={cls} dir="ltr" disabled={locked} onClick={() => { if (settings.confirm) { buzz(); setPending(i); } else commit(i); }} onDoubleClick={() => { if (settings.confirm && pending === i) commit(i); }}>{settings.letters && <span className="qz-letter" dir="ltr">{letters[i]}</span>}<span className="qz-opt-text" dir="ltr">{opt}</span>{feedback && (answered || submitted) && correct && <span className="qz-mark">✓</span>}{feedback && selected && !correct && <span className="qz-mark">✕</span>}</button>;
             })}</div>
         </div>
         {expired && !submitted && <p className="qz-hint" role="status">الوقت خلص. الإجابات اتقفلت، سلّم التجربة عشان تشوف النتيجة، أو صفّر العداد من الإعدادات.</p>}
@@ -318,7 +350,7 @@ function HomeView({ state, update, open, finish, goHomeToList, storage, celebrat
     const cardFor = (b: typeof banks[number]) => {
         const live = isLive(b);
         const answered = live ? ids.filter(id => picked[id] !== null).length : 0;
-        return <button type="button" key={b.id} role="option" aria-selected={setup.section === b.id} className={'qz-exam-card' + (live ? ' is-live' : '') + (setup.section === b.id && !live ? ' is-on' : '')} onClick={() => onCard(b)} onContextMenu={e => { e.preventDefault(); setDetailsBank(b); }}><span className="qz-exam-card-top"><span className="qz-exam-card-name">{b.name}</span><span className={'qz-exam-badge qz-badge-' + examType(b.name)}>{examTypeLabel(examType(b.name))}</span></span>{live && <span className="qz-exam-bar" aria-hidden="true"><span style={{ width: `${ids.length ? Math.round(answered / ids.length * 100) : 0}%` }} /></span>}<span className="qz-exam-card-meta">{toAr(String(b.ids.length))} سؤال · {toAr(String(b.minutes))} د</span><span className="qz-exam-card-status">{cardStatus(b)}</span></button>;
+        return <button type="button" key={b.id} className={'qz-exam-card' + (live ? ' is-live' : '') + (setup.section === b.id && !live ? ' is-on' : '')} onClick={() => onCard(b)} onContextMenu={e => { e.preventDefault(); setDetailsBank(b); }}><span className="qz-exam-card-top"><span className="qz-exam-card-name">{b.name}</span><span className={'qz-exam-badge qz-badge-' + examType(b.name)}>{examTypeLabel(examType(b.name))}</span></span>{live && <span className="qz-exam-bar" aria-hidden="true"><span style={{ width: `${ids.length ? Math.round(answered / ids.length * 100) : 0}%` }} /></span>}<span className="qz-exam-card-meta">{toAr(String(b.ids.length))} سؤال · {toAr(String(b.minutes))} د</span><span className="qz-exam-card-status">{cardStatus(b)}</span></button>;
     };
     // Exams grouped by year (newest first).
     const yearGroups: [number, typeof banks][] = (() => {
@@ -336,7 +368,7 @@ function HomeView({ state, update, open, finish, goHomeToList, storage, celebrat
             <span className="qz-set-label">طريقة التجربة</span><div className="qz-set-seg">{[['study', 'مذاكرة'], ['exam', 'امتحان']].map(([v, l]) => <button type="button" className={'qz-set-seg-btn' + (setup.mode === v ? ' is-on' : '')} key={v} aria-pressed={setup.mode === v} onClick={() => update({ setup: { ...setup, mode: v as Mode } })}>{l}</button>)}</div>
             {(wrongSet.size > 0 || flagIds.length > 0) && <div className="qz-learn-row">{wrongSet.size > 0 && <button type="button" className="qz-btn primary" onClick={() => startRun({ kind: 'notebook', ids: wrongIds })}>دفتر الغلطات ({toAr(String(wrongIds.length))})</button>}{flagIds.length > 0 && <button type="button" className="qz-btn primary" onClick={() => startRun({ kind: 'flagged', ids: flagIds })}>راجعني ({toAr(String(flagIds.length))})</button>}</div>}
             <label className="qz-set-label" htmlFor="bank-search">الاختبار أو البنك</label><input id="bank-search" className="qz-bank-input qz-bank-search" type="search" placeholder="ابحث عن بنك…" aria-label="ابحث عن بنك" value={bankQuery} onChange={e => setBankQuery(e.target.value)} />
-            <div className="qz-bank-list" role="listbox" aria-label="الاختبار أو البنك">{yearGroups.map(([y, gb]) => { const totalQ = gb.reduce((a, b) => a + b.ids.length, 0); return <div key={y} className="qz-bank-group"><p className="qz-bank-group-label qz-year-label">{y === 0 ? 'الاختبارات' : toAr(String(y))} · {toAr(String(totalQ))} سؤال</p><div className="qz-exam-grid">{gb.map(cardFor)}</div></div>; })}{filtered.length === 0 && <p className="qz-set-detail">مفيش نتائج للبحث.</p>}</div>
+            <div className="qz-bank-list" role="group" aria-label="الاختبار أو البنك">{yearGroups.map(([y, gb]) => { const totalQ = gb.reduce((a, b) => a + b.ids.length, 0); return <div key={y} className="qz-bank-group"><p className="qz-bank-group-label qz-year-label">{y === 0 ? 'الاختبارات' : toAr(String(y))} · {toAr(String(totalQ))} سؤال</p><div className="qz-exam-grid">{gb.map(cardFor)}</div></div>; })}{filtered.length === 0 && <p className="qz-set-detail">مفيش نتائج للبحث.</p>}</div>
             {detailsBank && <dialog ref={detailsRef} className="qz-ex-dialog" dir="rtl" onClose={() => setDetailsBank(null)} onCancel={() => setDetailsBank(null)}><CloseButton label="قفل" onClick={() => setDetailsBank(null)} /><p className="qz-explain-title">{detailsBank.name}</p><p className="qz-explain-body" dir="rtl">{toAr(String(detailsBank.ids.length))} سؤال · {toAr(String(detailsBank.minutes))} د{lastFor(detailsBank) >= 0 ? ` · آخر نتيجة ${toAr(String(lastFor(detailsBank)))}٪` : ' · لم يبدأ بعد'}</p><div className="qz-set-row"><div><span className="qz-set-label" id="set-shuffle">خلط ترتيب الأسئلة</span></div><button type="button" className={'qz-switch' + ((state.settings.shuffleBanks ?? []).includes(detailsBank.id) ? ' is-on' : '')} role="switch" aria-labelledby="set-shuffle" aria-checked={(state.settings.shuffleBanks ?? []).includes(detailsBank.id)} onClick={() => { const cur = state.settings.shuffleBanks ?? []; const on = cur.includes(detailsBank.id); update({ settings: { ...state.settings, shuffleBanks: on ? cur.filter(x => x !== detailsBank.id) : [...cur, detailsBank.id] } }); }}><span className="qz-switch-knob" /></button></div><div className="qz-set-actions"><button type="button" className="qz-btn primary" onClick={() => setDetailsBank(null)}>تمام</button></div></dialog>}
         </div>
     </div>;
@@ -459,6 +491,7 @@ function QuizHubApp() {
     const [burst, setBurst] = useState(0);
     const burstPieces = React.useMemo(() => Array.from({ length: 12 }, (_, i) => ({ left: (i * 37 + 13) % 100, delay: (i % 9) * 0.04, duration: 1.0 + (i % 5) * 0.15, color: ['#0b4f4a', '#D4A24C', '#20714a', '#ffffff', '#b98a2f'][i % 5], size: 6 + (i % 3) * 3 })), []);
     const scroller = useRef<HTMLDivElement>(null);
+    const modalRef = useRef<HTMLDivElement>(null);
     const [attemptKey, setAttemptKey] = useState(0);
     // The clock ticks every second on screen, but localStorage is written at
     // most every 10s (pause/answer/submit flush it).
@@ -479,6 +512,9 @@ function QuizHubApp() {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, [confirmAction]);
+    // Focus moves into the confirm modal on open, stays trapped inside,
+    // and returns to the trigger on close.
+    useDialogFocus(confirmAction !== null, modalRef);
     const ticking = ready && started && !submitted && !(allAnswered && state.mode === 'study') && !paused && !expired && opened && !(settings.quizOnly && tab !== 'quiz');
     useEffect(() => {
         if (!ticking) return;
@@ -643,14 +679,15 @@ function QuizHubApp() {
     ];
 
     if (!opened) {
-        return <div className="qz-launch qz-design-new" dir="rtl"><h2><QuizBrand /></h2><p>اختار الاختبار وكمّل من مكانك.</p><button type="button" className="qz-btn primary" onClick={() => setOpened(true)}>افتح التجربة</button></div>;
+        return <div className="qz-launch qz-design-new" dir="rtl"><h1 className="qz-sr-only">Quiz Hub — محاكاة امتحان مزاولة المهنة</h1><h2><QuizBrand /></h2><p>اختار الاختبار وكمّل من مكانك.</p><button type="button" className="qz-btn primary" onClick={() => setOpened(true)}>افتح التجربة</button></div>;
     }
 
     return (
         <div className={screenCls + (inQuiz ? ' qz-is-solving' : '')} style={{ '--qz-scale': fontPercent(settings) / 100 } as React.CSSProperties} aria-label="Quiz Hub، أسئلة مزاولة المهنة">
             <header className="qz-app-head">{!focus && <button type="button" className="qz-btn ghost qz-menu-btn" aria-label="القائمة" onClick={() => setDrawerOpen(true)}><MenuIcon /></button>}<QuizBrand compact />{inQuiz && !focus && settings.timer && <TimerPill elapsed={settings.countdown ? remaining : liveElapsed} countdown={settings.countdown} low={settings.countdown && remaining <= 300} />}{!inQuiz && <span className="qz-head-x" style={{ visibility: drawerOpen ? 'hidden' : 'visible' }}><CloseButton label="قفل التجربة" onClick={() => { if (tab !== 'home') goHome(); else setOpened(false); }} /></span>}</header>
             {burst > 0 && <div className="qz-confetti" key={burst} aria-hidden="true" data-testid="burst">{burstPieces.map((p, i) => <i key={i} style={{ left: `${p.left}%`, width: p.size, height: p.size * 1.4, background: p.color, animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s` }} />)}</div>}
-            <div className="qz-scroll" ref={scroller}>
+            <main className="qz-scroll" ref={scroller}>
+                <h1 className="qz-sr-only">Quiz Hub — محاكاة امتحان مزاولة المهنة</h1>
                 {!(inQuiz) && <div className="qz-topbar">
                     <span className="qz-mode">{!started ? 'إعداد التجربة' : state.mode === 'study' ? 'وضع المذاكرة' : 'وضع الامتحان'}</span>
                 </div>}
@@ -659,9 +696,9 @@ function QuizHubApp() {
                 {inQuiz && <QuizView state={{ ...state, index: safeIndex }} update={update} viewIds={viewIds} jump={id => update({ index: id })} pick={pick} expired={expired} finish={finish} review={review} setReview={open} goHome={goHome} goHomeToList={goHomeToList} attemptKey={attemptKey} focus={focus} setFocus={setFocus} mapSignal={mapSignal} onMapOpened={() => setMapSignal(0)} />}
                 {tab === 'quiz' && !started && !submitted && <div className="qz-home"><p>اختار طريقة التجربة من الرئيسية الأول.</p><button type="button" className="qz-btn primary" onClick={() => update({ tab: 'home' })}>إعداد التجربة</button></div>}
                 {tab === 'settings' && <SettingsView backup={{ make: makeBackup, restore: restoreBackup }} settings={settings} setSettings={v => update({ settings: v })} onReset={reset} paused={paused} setPaused={v => update({ paused: v })} resetClock={() => update({ elapsed: 0 })} />}
-            </div>
+            </main>
             <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} items={drawerItems} dark={settings.dark} onDark={v => update({ settings: { ...settings, dark: v } })} fontPct={fontPercent(settings)} onFontScale={v => update({ settings: { ...settings, fontScale: v } })} />
-            {confirmAction && <div className="qz-modal-wrap">
+            {confirmAction && <div className="qz-modal-wrap" ref={modalRef}>
                 <div className="qz-modal-scrim" onClick={() => setConfirmAction(null)} />
                 <div className="qz-modal qz-confirm-box" role="alertdialog" aria-label="تأكيد">
                     <p>{confirmAction === 'finish' ? (ids.some(id => picked[id] === null) ? 'في أسئلة لسه من غير إجابة. هتتحسب ضمن الدرجة، تسلّم دلوقتي؟' : 'كل الأسئلة مجاوبة. تسلّم دلوقتي وتعرض النتيجة؟') : 'هتبدأ تجربة جديدة وتمسح الإجابات والنتيجة والوقت الحاليين. الإعدادات هتفضل زي ما هي.'}</p>

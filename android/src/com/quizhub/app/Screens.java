@@ -687,14 +687,17 @@ final class Screens {
         if (a.bank.missingImage(q.gid))
             add(c, detail(a, "الصورة المشار إليها غير موجودة في المصدر."), 8);
 
-        // Tools row: translate, flag, audio (with waveform), explain, share,
-        // hint, focus. In study mode the audio / explanation / translation
-        // icons work BEFORE answering; in exam mode they stay after-answer only.
-        // The web demo wraps its one tools row into two visual rows (row 1:
-        // translate, flag, audio, explain, share; row 2: hint, focus) — a
-        // single Android row overflows the screen and pushes the last two
-        // tools off the left edge, which is why the phone showed only 6
-        // tools with no hint button and no تركيز. Two rows here, same order.
+        // Tools row: translate, flag, audio (with waveform), explain. In
+        // study mode the audio / explanation / translation icons work BEFORE
+        // answering; in exam mode they stay after-answer only.
+        // The web demo wraps its one tools row (flex-wrap) into two visual
+        // rows — a single Android row overflows the screen and pushes the
+        // last tools off the left edge, which is why the phone showed only 6
+        // tools with no hint button and no تركيز. Two rows here, same order:
+        // row 1 translate / flag / audio / explain, row 2 hint / focus /
+        // share. (Share used to sit on row 1; the row's fixed-size children
+        // already fill a 360dp phone, so the share button was squeezed to a
+        // ~22dp sliver — invisible on a 320dp phone.)
         LinearLayout tools = new LinearLayout(a);
         tools.setGravity(Gravity.CENTER_VERTICAL);
         android.widget.ImageView tr = iconChip(a, a.trOpen, R.drawable.ic_translate, "الترجمة");
@@ -748,13 +751,6 @@ final class Screens {
             ep.setMarginStart(dp(a,6));
             ex.setOnClickListener(v -> showExplain(a));
             tools.addView(ex, ep);
-            // Share the question as a designed image (same gate as the explanation — the image carries the answer).
-            Button share = toolBtn(a, "مشاركة");
-            share.setTextSize(11f); share.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6));
-            LinearLayout.LayoutParams shp = new LinearLayout.LayoutParams(-2, dp(a,44));
-            shp.setMarginStart(dp(a,6));
-            share.setOnClickListener(v -> a.shareQuestion());
-            tools.addView(share, shp);
         }
         LinearLayout tools2 = new LinearLayout(a);
         tools2.setGravity(Gravity.CENTER_VERTICAL);
@@ -772,7 +768,18 @@ final class Screens {
             foc.setOnClickListener(v -> { a.focus = true; a.renderAll(); });
             tools2.addView(foc, fop);
         }
-        if (!a.focus) { add(c, tools, 6); add(c, tools2, 6); }
+        if (feedback && (answered || s.submitted || preAnswer)) {
+            // Share the question as a designed image (same gate as the
+            // explanation — the image carries the answer). Lives on the
+            // second tools row: row 1 is already full on a 360dp phone.
+            Button share = toolBtn(a, "مشاركة");
+            share.setTextSize(11f); share.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6));
+            LinearLayout.LayoutParams shp = new LinearLayout.LayoutParams(-2, dp(a,44));
+            shp.setMarginStart(dp(a,6));
+            share.setOnClickListener(v -> a.shareQuestion());
+            tools2.addView(share, shp);
+        }
+        if (!a.focus) { add(c, tools, 4); add(c, tools2, 4); }
 
         if (a.trOpen && q.tr != null) {
             TextView trv = Ui.tv(a, q.tr, t.bodySize(), t.body(), t.bodyColor());
@@ -841,7 +848,7 @@ final class Screens {
                 if (s.confirm) { a.pending = fi; a.pendingByQuestion.put(s.index, fi); a.renderAll(); } else a.commit(fi);
             });
             LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-1,-2);
-            olp.topMargin = dp(a, s.spacious ? 12 : 6);
+            olp.topMargin = dp(a, s.spacious ? 12 : 4);
             opts.addView(opt, olp);
         }
         a.popOnce = false;
@@ -853,7 +860,7 @@ final class Screens {
         if (s.confirm && a.pending != null && !s.expired() && !s.submitted) {
             Button cb = goldBtn(a, "تأكيد الإجابة"); // full-width gold confirm
             cb.setOnClickListener(v -> a.commit(a.pending));
-            add(c, cb, 8);
+            add(c, cb, 6);
         }
 
         // Visible السابق/التالي buttons — swipe stays as an extra, not the
@@ -874,11 +881,11 @@ final class Screens {
             LinearLayout.LayoutParams nn = new LinearLayout.LayoutParams(0, -2, 1f);
             nn.setMarginStart(dp(a, 10));
             nav.addView(next, nn);
-            add(c, nav, 8);
+            add(c, nav, 6);
         }
         Button cta = btn(a, s.submitted ? "الرجوع للرئيسية" : "إنهاء وعرض النتيجة", true);
         cta.setOnClickListener(v -> { if (s.submitted) a.goHomeToList(); else a.finishQuiz(); });
-        add(c, cta, 8);
+        add(c, cta, 6);
     }
 
     /** Circular icon chip with a real vector icon + contentDescription (TalkBack). */

@@ -268,6 +268,11 @@ public class MainActivity extends Activity {
 
     void refreshHeader() {
         header.removeAllViews();
+        // Narrow phones (<360dp): mirror the web demo's @media (max-width:
+        // 350px) header — tighter side padding and a smaller hamburger gap,
+        // so the brand + timer pill still fit with nothing clipped.
+        boolean narrow = getResources().getConfiguration().screenWidthDp < 360;
+        header.setPadding(Ui.dp(this, narrow ? 10 : 16), 0, Ui.dp(this, narrow ? 10 : 16), 0);
         // Solving = on the quiz tab while answering a live attempt — or
         // while reviewing a submitted one (a finished attempt has
         // started: false, but its review is still the quiz screen, with the
@@ -283,7 +288,7 @@ public class MainActivity extends Activity {
             menu.setContentDescription("القائمة");
             menu.setOnClickListener(v -> openDrawer());
             LinearLayout.LayoutParams mp2 = new LinearLayout.LayoutParams(Ui.dp(this,44), Ui.dp(this,44));
-            mp2.setMarginEnd(Ui.dp(this, 12));
+            mp2.setMarginEnd(Ui.dp(this, narrow ? 4 : 12));
             header.addView(menu, mp2);
         }
         // brand: mark + name, LTR
@@ -306,8 +311,9 @@ public class MainActivity extends Activity {
         else brand.setGravity(Gravity.CENTER);
         header.addView(brand, new LinearLayout.LayoutParams(0, -1, 1f));
         if (solving && !focus && s.timer) {
+            // The label stays visible, like the web pill ("الوقت" / "باقي"):
+            // without it the user cannot tell elapsed time from a countdown.
             View tc = makeTimerChip();
-            if (timerChipLabel != null) timerChipLabel.setVisibility(View.GONE);
             LinearLayout.LayoutParams tcp = new LinearLayout.LayoutParams(-2, -2);
             tcp.setMarginEnd(Ui.dp(this, 8));
             header.addView(tc, tcp);
