@@ -1,28 +1,22 @@
-# Quiz Hub, native Android app
+# Quiz Hub — clean rebuild (android-clean)
 
-Offline nursing-exam question bank. 1,186 questions in 10 tests, each with a lecturer clip or a generated Egyptian-Arabic audio explanation (generated clips are labeled as generated, not the lecturer). Package `com.quizhub.app`, minSdk 24. Plain Java, no Gradle, no libraries.
+Fresh from-scratch Android implementation of the agreed round-5 design
+(soft ivory #F5F3EE, gold accents, deep-teal dark mode), plain Java, no
+Gradle/libraries, minSdk 24, package com.quizhub.app. Built from the demo
+spec (fixes-round-5/FIXES_REPORT.md) — no old code was copied over; the
+previous tree under build-apk/ was read only as a reference for verified
+behaviour (bank loading, audio playback, save/resume, backup codes).
 
-Signed APKs are on the Releases page of this repo. Run the commands below from this `android/` folder.
+Data (copied as-is, never edited): assets/bank (10 banks, 1,186 questions,
+incl. the 15 lecturer keys), assets/audio (1,171 mp3s incl. the 5 fixed
+clips r427/r853/r1144/r1166/r1173), assets/clip_map.json, fonts, branding,
+sfx, launcher icons.
 
-## Layout
-- `src/`, `res/`, `AndroidManifest.xml`: app code and resources.
-- `assets/bank/`: question banks (bank-0..9.json, index.json). `assets/audio/`: clips (g* generated, r* lecturer; `clip_map.json` maps duplicate names to one stored file). `assets/fonts`, `assets/branding`, `assets/sfx`.
-- `tools/build.sh`: builds an unsigned, aligned APK.
-- `tests/`: Robolectric UI harness sources used for screenshots and state checks (a harness, not a device test).
-- `signing/quizhub-release-cert.pem`: PUBLIC certificate only. SHA-256 of the release signer: 19feecae1df35141ba896216bc7837080bfd78bc6e645b3929243058787ce203. The private key is not in this repo.
+Build: JDK 17 on PATH, ANDROID_BUILD_TOOLS + ANDROID_JAR set, then
+`tools/build.sh`. Tests: `tests/run_verify.sh` (Verify1, 14 tests, needs
+RLIBS + ANDROID_JAR). R5/R7 items pending Mohamed's decision are preserved
+exactly as in the previous build (settings detail paragraphs; source line +
+generated-audio note in the explanation dialog) — see the R5/R7 comments in
+Screens.java.
 
-## Build
-Needs JDK 11+, `zip`, Android SDK build-tools 34 (aapt2, d8, zipalign) and platform android-34.
-```
-ANDROID_BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0 ANDROID_JAR=$ANDROID_HOME/platforms/android-34/android.jar tools/build.sh
-apksigner sign --ks my.p12 --out QuizHub.apk build/QuizHub-unsigned.apk
-```
-An APK signed with another key cannot update over the release APK (uninstall first, after backing up progress in Settings).
-
-## Notes
-- Audio files must stay stored (uncompressed) in the APK. `tools/build.sh` does this.
-- Progress backup format is the web-compatible `QH2` code (Settings).
-- Tested in a Robolectric harness and with apksigner/zipalign. Real-phone playback was not confirmed at the time of this commit.
-
-## Backup and old progress compatibility
-Backup codes transfer between the current web build and the current Android build (1,186 questions). There is no automatic migration of progress or notebook from the older 3,122-question build: the old question order is not available, so nothing is mapped. Old data is kept as raw text and can be exported from Settings, Backup. A 3,122-question code is refused and the current progress is left unchanged.
+No GitHub writes, no uploads, no real-phone verification yet.

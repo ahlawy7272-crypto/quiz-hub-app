@@ -40,7 +40,7 @@ public class Verify1 {
         assertEquals("the untouched old state must be kept", rawBefore, p.getString("state_legacy_backup", null));
         assertNotNull("a notice must tell the user the old state was not converted", s.notice);
         // nothing is mapped by identity: fresh start, no ids or answers carried over
-        assertEquals(a.bank.banks.get(0).ids.length, s.ids.length);
+        assertEquals(a.bank.defaultBank().ids.length, s.ids.length);
         for (int v : s.picked) assertEquals(-1, v);
         assertTrue(s.favorites.isEmpty() && s.wrong.isEmpty());
         assertTrue(a.bank.has(s.bankKey) && a.bank.has(s.setupSection));
@@ -119,6 +119,138 @@ public class Verify1 {
             assertNull(ctl.get().s);
             ctl.pause().stop().destroy();
         } finally { Bank.assetDirOverride = null; }
+    }
+
+    /** byId() must return null for an unknown bank instead of silently switching banks. */
+    @Test public void unknownBankIdReturnsNull() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        assertNull(a.bank.byId("42"));
+        assertNull(a.bank.byId(""));
+        assertNotNull(a.bank.byId("6"));
+        assertEquals("6", a.bank.byId("6").id);
+    }
+
+    /** forIds() must skip unknown gids instead of adding nulls. */
+    @Test public void forIdsFiltersUnknownIds() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        java.util.List<Bank.Question> qs = a.bank.forIds(new int[]{598, 9999, 599, -1});
+        assertEquals(2, qs.size());
+        for (Bank.Question q : qs) assertNotNull(q);
+        assertEquals(598, qs.get(0).gid);
+        assertEquals(599, qs.get(1).gid);
+    }
+
+    /** Picked values outside '.' / '0'..'4' must be reset to unanswered, not kept as odd values. */
+    @Test public void invalidPickedValuesAreReset() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.s.setupSection = "6"; a.begin(); a.save();
+        android.content.SharedPreferences p = a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE);
+        JSONObject j = new JSONObject(p.getString("state", null));
+        int n = a.s.ids.length;
+        StringBuilder pk = new StringBuilder();
+        for (int i = 0; i < n; i++) pk.append(i == 0 ? '9' : i == 1 ? 'x' : i == 2 ? '2' : '.');
+        j.put("picked", pk.toString());
+        p.edit().putString("state", j.toString()).commit();
+        Session s = Session.load(a, a.bank);
+        assertEquals(-1, s.picked[0]);
+        assertEquals(-1, s.picked[1]);
+        assertEquals(2, s.picked[2]);
+        assertNull("a single bad answer must not trigger a whole-session reset", s.notice);
+    }
+
+    /** A backup code naming a bank that does not exist in this build is refused, state untouched. */
+    @Test public void backupRestoreWithUnknownSectionIsRefused() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        String code = fixture();
+        byte[] z = android.util.Base64.decode(code.substring(4), android.util.Base64.DEFAULT);
+        java.util.zip.Inflater inf = new java.util.zip.Inflater(true); inf.setInput(z);
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] buf = new byte[8192];
+        while (!inf.finished()) { int n = inf.inflate(buf); if (n == 0) break; bo.write(buf, 0, n); }
+        JSONObject o = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
+        o.getJSONObject("s").getJSONObject("setup").put("section", "42");
+        java.util.zip.Deflater df = new java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true);
+        byte[] in = o.toString().getBytes("UTF-8"); df.setInput(in); df.finish();
+        java.io.ByteArrayOutputStream bo2 = new java.io.ByteArrayOutputStream(); byte[] buf2 = new byte[8192];
+        while (!df.finished()) { int n = df.deflate(buf2); bo2.write(buf2, 0, n); }
+        df.end();
+        String bad = "QH2." + android.util.Base64.encodeToString(bo2.toByteArray(), android.util.Base64.NO_WRAP);
+        a.save();
+        String before = a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE).getString("state", null);
+        String msg = Backup.restore(a, bad);
+        assertTrue(msg.contains("مش موجود"));
+        assertEquals(before, a.getSharedPreferences("quizhub_native_v1", android.content.Context.MODE_PRIVATE).getString("state", null));
+    }
+
+    /** S1-1: a notebook run must survive the next launch — bankKey must stay a real bank id, not the run kind. */
+    @Test public void notebookRunSurvivesReload() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.startRun("notebook", new int[]{598, 599, 600});
+        assertEquals("notebook", a.s.run);
+        assertTrue("bankKey must be a real bank id", a.bank.has(a.s.bankKey));
+        // answer one question wrong so there is real progress to lose
+        a.pick((a.qs.get(0).c + 1) % a.qs.get(0).o.length);
+        int wrongGid = a.qs.get(0).gid;
+        a.save();
+        Session s2 = Session.load(a, a.bank);
+        assertNull("a notebook run is this build's own session, not foreign data", s2.notice);
+        assertEquals("notebook", s2.run);
+        assertTrue(a.bank.has(s2.bankKey));
+        assertEquals(3, s2.ids.length);
+        assertEquals(598, s2.ids[0]);
+        assertTrue("the wrong answer must still be in the notebook", s2.wrong.contains(wrongGid));
+        assertTrue("the picked answer must survive", s2.picked[0] >= 0);
+    }
+
+    /** S1-1 via backup: a notebook code round-trips, and an old-format code with bank="notebook" restores too. */
+    @Test public void notebookBackupRoundTripAndOldBankKind() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.startRun("notebook", new int[]{598, 599});
+        String code = Backup.make(a);
+        assertEquals("اتسترجع التقدم.", Backup.restore(a, code));
+        assertEquals("notebook", a.s.run);
+        assertTrue(a.bank.has(a.s.bankKey));
+        assertEquals(2, a.s.ids.length);
+        // old format: the code's "bank" field carries the run kind instead of a bank id
+        byte[] z = android.util.Base64.decode(code.substring(4), android.util.Base64.DEFAULT);
+        java.util.zip.Inflater inf = new java.util.zip.Inflater(true); inf.setInput(z);
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] buf = new byte[8192];
+        while (!inf.finished()) { int n = inf.inflate(buf); if (n == 0) break; bo.write(buf, 0, n); }
+        JSONObject o = new JSONObject(new String(bo.toByteArray(), "UTF-8"));
+        o.getJSONObject("s").put("bank", "notebook");
+        java.util.zip.Deflater df = new java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true);
+        byte[] in = o.toString().getBytes("UTF-8"); df.setInput(in); df.finish();
+        java.io.ByteArrayOutputStream bo2 = new java.io.ByteArrayOutputStream(); byte[] buf2 = new byte[8192];
+        while (!df.finished()) { int n = df.deflate(buf2); bo2.write(buf2, 0, n); }
+        df.end();
+        String oldCode = "QH2." + android.util.Base64.encodeToString(bo2.toByteArray(), android.util.Base64.NO_WRAP);
+        assertEquals("اتسترجع التقدم.", Backup.restore(a, oldCode));
+        assertEquals("notebook", a.s.run);
+        assertTrue(a.bank.has(a.s.bankKey));
+        assertEquals(2, a.s.ids.length);
+    }
+
+    /** S3-1: leaving the result screen for home must not wipe the result or the attempt. */
+    @Test public void goHomeKeepsResult() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.s.setupSection = "6"; a.begin();
+        a.pick(a.qs.get(0).c);
+        a.s.submitted = true; a.s.resultElapsed = 42; a.save();
+        a.goHome();
+        assertTrue(a.s.started);
+        assertTrue(a.s.submitted);
+        assertEquals(42, a.s.resultElapsed);
+        assertEquals(a.qs.get(0).c, a.s.picked[0]);
+        assertEquals("home", a.s.tab);
+    }
+
+    /** S3-7: resetting settings must reset the minutes too. */
+    @Test public void resetSettingsResetsMinutes() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        a.s.minutes = 5; a.s.volume = 10; a.s.dark = true;
+        Screens.resetSettings(a);
+        assertEquals(120, a.s.minutes);
+        assertEquals(80, a.s.volume);
+        assertFalse(a.s.dark);
     }
 
     /** Every question has a clip (lecturer r or generated g, after clip_map), none empty. */

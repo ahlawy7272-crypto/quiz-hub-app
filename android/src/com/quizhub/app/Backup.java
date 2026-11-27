@@ -7,7 +7,10 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.Charset;
 import java.util.zip.Inflater;
 
-/** Backup code compatible with the web app format: "QH1." + base64(JSON {v:1,s,x}). Restores QH2 (deflate-raw) too. */
+/** Backup code compatible with the web app format: "QH2." + base64(deflate-raw JSON).
+ *  Restores QH2 and the older QH1 (plain base64 JSON). A code from the older
+ *  3,122-question build is refused — the old id order is not available, so it
+ *  cannot be mapped safely, and the current state is left untouched. */
 public final class Backup {
     static final int N = 1186;
     static final Charset U8 = Charset.forName("UTF-8");
@@ -43,9 +46,10 @@ public final class Backup {
         for (int g : s.favorites) if (g >= 0 && g < N) fav[g] = '1';
         JSONObject setup = new JSONObject();
         Bank.BankMeta sb = a.bank.byId(s.setupSection);
+        if (sb == null) { sb = a.bank.defaultBank(); s.setupSection = sb.id; }
         setup.put("section", sb.id); setup.put("count", sb.ids.length); setup.put("mode", s.setupMode);
         JSONObject o = new JSONObject();
-        o.put("run", s.run); o.put("bank", s.run.equals("all") ? s.bankKey : s.run);
+        o.put("run", s.run); o.put("bank", s.bankKey); // bankKey is always a real bank id; the run kind lives in "run" only
         o.put("settings", st); o.put("favorites", new String(fav));
         o.put("ids", new JSONArray(toList(s.ids))); o.put("picked", new String(picked));
         o.put("index", s.ids.length > 0 ? s.ids[Math.min(s.index, s.ids.length - 1)] : 0);
@@ -81,10 +85,16 @@ public final class Backup {
             if (obj.optInt("v") != 1 || st == null || ex == null) return "الكود مش صحيح.";
             String pk = st.optString("picked", ""), fv = st.optString("favorites", "");
             JSONArray idsA = st.optJSONArray("ids"); JSONObject se = st.optJSONObject("settings");
-            // Code from the older 3,122-question build is refused: the old id order is not available, so it cannot be mapped safely. Current state is not touched.
             if (pk.length() == 3122 || fv.length() == 3122) return "الكود ده من نسخة قديمة (٣١٢٢ سؤال) ومش مدعوم هنا. تقدمك الحالي ما اتغيّرش.";
             if (pk.length() != N || fv.length() != N || idsA == null || se == null || ex.optJSONArray("h") == null || !ex.has("w"))
                 return "الكود مش صحيح.";
+            // Picked answers are only '.' (unanswered) or '0'..'4'; anything else is a
+            // corrupt/forged code — refuse it instead of decoding garbage into picked[].
+            // Same rule as the web backup: /^[.0-4]*$/.
+            for (int i = 0; i < N; i++) { char c = pk.charAt(i); if (c != '.' && (c < '0' || c > '4')) return "الكود مش صحيح."; }
+            JSONObject su0 = st.optJSONObject("setup");
+            if (su0 != null && !a.bank.has(su0.optString("section", Bank.DEFAULT_BANK_ID)))
+                return "البنك اللي في الكود مش موجود في النسخة دي. تقدمك الحالي ما اتغيّرش.";
             int[] ids = new int[idsA.length()];
             for (int i = 0; i < ids.length; i++) { ids[i] = idsA.getInt(i); if (ids[i] < 0 || ids[i] >= N) return "الكود مش من نفس النسخة."; }
             Session.keepBeforeRestore(a);
@@ -99,7 +109,7 @@ public final class Backup {
             for (int i = Math.max(0, h.length() - 60); i < h.length(); i++) hh.put(h.get(i));
             s.history = hh;
             s.run = st.optString("run", "all"); if (!s.run.equals("notebook") && !s.run.equals("flagged")) s.run = "all";
-            s.bankKey = st.optString("bank", "6");
+            s.bankKey = st.optString("bank", Bank.DEFAULT_BANK_ID);
             s.dark = se.optBoolean("dark"); s.spacious = se.optBoolean("spacious"); s.contrast = se.optBoolean("contrast");
             s.calm = se.optBoolean("calm"); s.steps = se.optBoolean("steps", true); s.letters = se.optBoolean("letters", true);
             s.confirm = se.optBoolean("confirm"); s.autoNext = se.optBoolean("autoNext"); s.retry = se.optBoolean("retry");
@@ -115,8 +125,13 @@ public final class Backup {
             s.mode = st.optString("mode", "study").equals("exam") ? "exam" : "study";
             s.tab = "home";
             JSONObject su = st.optJSONObject("setup");
-            if (su != null) { s.setupSection = su.optString("section", "6"); s.setupMode = su.optString("mode", "study"); }
-            a.qs = null; a.theme.dark = s.dark; a.theme.scale = s.fontPercent / 100f;
+            if (su != null) { s.setupSection = su.optString("section", Bank.DEFAULT_BANK_ID); s.setupMode = su.optString("mode", "study"); }
+            // Codes written during a notebook/flagged run store the run kind in "bank";
+            // point bankKey at the real setup bank so sanitize() never treats it as foreign.
+            if ((s.bankKey.equals("notebook") || s.bankKey.equals("flagged")) && s.bankKey.equals(s.run)) {
+                s.bankKey = a.bank.has(s.setupSection) ? s.setupSection : a.bank.defaultBank().id;
+            }
+            a.qs = null; a.pending = null; a.pendingByQuestion.clear(); a.theme.dark = s.dark; a.theme.scale = s.fontPercent / 100f;
             a.save(); a.buildScreen(); a.renderAll();
             return "اتسترجع التقدم.";
         } catch (Exception e) { return "الكود مش صحيح أو ناقص."; }
