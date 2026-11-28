@@ -291,7 +291,7 @@ public class Verify1 {
         MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
         assertEquals(1186, a.bank.total());
         int missing = 0;
-        for (int i = 0; i < 1186; i++) if (!ClipPlayer.exists(a, "r" + i + ".mp3") && !ClipPlayer.exists(a, "g" + i + ".mp3")) missing++;
+        for (int i = 0; i < 1186; i++) if (!ClipPlayer.exists(a, "g" + i + ".mp3")) missing++;
         assertEquals(0, missing);
     }
 }

@@ -1,6 +1,6 @@
 # Quiz Hub
 
-Nursing licensing exam practice, 1,186 questions in 10 tests, with a lecturer clip or a generated Egyptian-Arabic explanation (generated clips are labeled as generated, not the lecturer).
+Nursing licensing exam practice, 1,186 questions in 10 tests, with a generated Egyptian-Arabic audio explanation for every question.
 
 Two versions, kept separate:
 - `android/`: the native Android app (offline, all audio inside). Package `com.quizhub.app`. Signed APKs are on the Releases page.

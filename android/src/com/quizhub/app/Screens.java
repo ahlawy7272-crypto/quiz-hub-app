@@ -719,8 +719,7 @@ final class Screens {
             fp.setMarginStart(dp(a,6));
             tools.addView(fl, fp);
         }
-        String clipFile = ClipPlayer.exists(a, "r" + q.gid + ".mp3") ? "r" + q.gid + ".mp3"
-            : ClipPlayer.exists(a, "g" + q.gid + ".mp3") ? "g" + q.gid + ".mp3" : null;
+        String clipFile = ClipPlayer.exists(a, "g" + q.gid + ".mp3") ? "g" + q.gid + ".mp3" : null;
         boolean preAnswer = s.mode.equals("study") && !s.submitted;
         if (clipFile != null && feedback && (answered || s.submitted || preAnswer)) {
             final String cf = clipFile;
@@ -743,7 +742,7 @@ final class Screens {
             tools.addView(wv, wp);
         }
         // Stop the clip of another question only when one is actually playing.
-        if (ClipPlayer.isAnyPlaying() && !ClipPlayer.isPlaying("r" + q.gid + ".mp3") && !ClipPlayer.isPlaying("g" + q.gid + ".mp3")) ClipPlayer.stop();
+        if (ClipPlayer.isAnyPlaying() && !ClipPlayer.isPlaying("g" + q.gid + ".mp3")) ClipPlayer.stop();
         if (feedback && (answered || s.submitted || preAnswer)) {
             Button ex = toolBtn(a, "الشرح");
             ex.setTextSize(11f); ex.setPadding(dp(a,12),dp(a,6),dp(a,12),dp(a,6));
@@ -1022,8 +1021,7 @@ final class Screens {
                 try { a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(q.url))); } catch (Exception ignore) {}
             });
         }
-        addAudio(a, box, q, "r" + q.gid + ".mp3", "تسجيل الدكتور");
-        addAudio(a, box, q, "g" + q.gid + ".mp3", "تسجيل الدكتور");
+        addAudio(a, box, q, "g" + q.gid + ".mp3", "استمع للشرح");
         d.setOnDismissListener(x -> ClipPlayer.stop());
         Button close = btn(a, "قفل الشرح", false);
         close.setOnClickListener(v -> d.dismiss());

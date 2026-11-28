@@ -27,7 +27,7 @@ with ThreadPoolExecutor(8) as ex:
 bad = [r for r in res if r[1] or r[2] < 1000]
 check(not bad, f'{len(bad)} audio files fail to decode or are tiny: {[b[0] for b in bad[:5]]}')
 gen = set(map(int, re.findall(r'\d+', m.split('generatedAudio')[1].split('[',1)[1].split(']')[0])))
-check(len(gen) == 487 and all(ent[g].startswith('g') for g in gen), 'generatedAudio set does not match g clips')
+check(len(gen) == n and all(ent[g].startswith('g') for g in gen), 'generatedAudio set does not match g clips')
 print('questions', n, '| audio keys', len(ent), '| files', len(files), '| generated', len(gen), '| decode failures', len(bad))
 if fail:
     print('FAIL:\n- ' + '\n- '.join(fail)); sys.exit(1)
